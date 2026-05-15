@@ -10,6 +10,10 @@ export const metadata: Metadata = {
     title: "Orenda",
     statusBarStyle: "black-translucent",
   },
+  icons: {
+    icon: "/icon.png",
+    apple: "/icon.png",
+  },
 };
 
 export const viewport: Viewport = {
