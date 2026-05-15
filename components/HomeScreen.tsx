@@ -20,7 +20,7 @@ import seiriImage from "@/source-images/seiri.png";
 import souronImage from "@/source-images/souron.png";
 import tougaiImage from "@/source-images/tougai.png";
 import tourinImage from "@/source-images/tourin.png";
-import { avatarIcons, type AvatarIconId } from "@/lib/avatarIcons";
+import { avatarIcons, getAvatarIcon, type AvatarIconId } from "@/lib/avatarIcons";
 
 const menuItems = [
   {
@@ -163,6 +163,24 @@ type StudyRecordData = {
   };
 };
 
+type StudyRankingItem = {
+  avatarIconId: AvatarIconId;
+  displayName: string;
+  gakuseiId: string;
+  isCurrentUser: boolean;
+  note: string;
+  rank: number;
+  weekMinutes: number;
+};
+
+type StudyRankingData = {
+  ranking: StudyRankingItem[];
+  week: {
+    endDate: string;
+    startDate: string;
+  };
+};
+
 function formatStudyMinutes(minutes: number) {
   const hours = Math.floor(minutes / 60);
   const restMinutes = minutes % 60;
@@ -298,7 +316,7 @@ export function HomeScreen() {
   const [needsProfileSetup, setNeedsProfileSetup] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [activeScreen, setActiveScreen] = useState<
-    "menu" | "timer" | "stopwatch" | "record"
+    "menu" | "timer" | "stopwatch" | "record" | "ranking"
   >("menu");
   const [selectedSubject, setSelectedSubject] = useState<StudySubject | null>(null);
   const [studySummary, setStudySummary] = useState<StudySummary>({
@@ -307,9 +325,11 @@ export function HomeScreen() {
     totalMinutes: 0,
   });
   const [studyRecord, setStudyRecord] = useState<StudyRecordData | null>(null);
+  const [studyRanking, setStudyRanking] = useState<StudyRankingData | null>(null);
   const [selectedRecordPeriod, setSelectedRecordPeriod] =
     useState<RecordPeriod>("month");
   const [isStudySummaryLoading, setIsStudySummaryLoading] = useState(false);
+  const [isStudyRankingLoading, setIsStudyRankingLoading] = useState(false);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [isStopwatchRunning, setIsStopwatchRunning] = useState(false);
   const [stopwatchMessage, setStopwatchMessage] = useState("");
@@ -406,6 +426,46 @@ export function HomeScreen() {
     recordCalendarMonth.year,
     selectedRecordPeriod,
   ]);
+
+  useEffect(() => {
+    if (!isLoggedInPreview || activeScreen !== "ranking") {
+      return;
+    }
+
+    let isMounted = true;
+
+    async function loadStudyRanking() {
+      setIsStudyRankingLoading(true);
+
+      const response = await fetch("/api/study-ranking").catch(() => null);
+
+      if (!isMounted) {
+        return;
+      }
+
+      setIsStudyRankingLoading(false);
+
+      if (!response?.ok) {
+        return;
+      }
+
+      const result = (await response.json().catch(() => null)) as
+        | StudyRankingData
+        | null;
+
+      if (!result) {
+        return;
+      }
+
+      setStudyRanking(result);
+    }
+
+    void loadStudyRanking();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [activeScreen, isLoggedInPreview]);
 
   useEffect(() => {
     if (!isStopwatchRunning) {
@@ -539,6 +599,7 @@ export function HomeScreen() {
       totalMinutes: 0,
     });
     setStudyRecord(null);
+    setStudyRanking(null);
     setSelectedRecordPeriod("month");
     setRecordCalendarMonth(getCurrentJapanYearMonth());
     setSelectedAvatarIconId("pixel01");
@@ -776,7 +837,11 @@ export function HomeScreen() {
               <span aria-hidden="true">▣</span>
               カード
             </button>
-            <button className="timerNavItem" type="button">
+            <button
+              className="timerNavItem"
+              type="button"
+              onClick={() => setActiveScreen("ranking")}
+            >
               <span aria-hidden="true">👥</span>
               交流
             </button>
@@ -1074,7 +1139,116 @@ export function HomeScreen() {
               <span aria-hidden="true">▣</span>
               カード
             </button>
+            <button
+              className="timerNavItem"
+              type="button"
+              onClick={() => setActiveScreen("ranking")}
+            >
+              <span aria-hidden="true">👥</span>
+              交流
+            </button>
+          </nav>
+        </section>
+      </main>
+    );
+  }
+
+  if (isLoggedInPreview && activeScreen === "ranking") {
+    const rankingItems = studyRanking?.ranking ?? [];
+
+    return (
+      <main className="appShell">
+        <section
+          className="phoneFrame rankingScreen"
+          aria-label="学習ランキング画面"
+          style={{ backgroundImage: `url(${backgroundImage.src})` }}
+        >
+          <header className="timerHeader">
+            <button
+              className="timerBackButton"
+              type="button"
+              onClick={() => setActiveScreen("menu")}
+            >
+              <span aria-hidden="true">‹</span>
+              戻る
+            </button>
+            <h1>学習ランキング</h1>
+            <span className="timerHeaderBalance" aria-hidden="true" />
+          </header>
+
+          <div className="rankingContent">
+            <section className="rankingIntroCard">
+              <h2>今週の勉強時間ランキング</h2>
+              <p>他のユーザーの学習量をチェックしよう</p>
+            </section>
+
+            <section className="rankingList" aria-label="今週のランキング">
+              {isStudyRankingLoading ? (
+                <p className="rankingEmptyText">ランキングを読み込んでいます。</p>
+              ) : null}
+
+              {!isStudyRankingLoading && rankingItems.length === 0 ? (
+                <p className="rankingEmptyText">
+                  今週の学習記録が登録されるとランキングが表示されます。
+                </p>
+              ) : null}
+
+              {rankingItems.map((item) => {
+                const avatar = getAvatarIcon(item.avatarIconId);
+
+                return (
+                  <article
+                    className={`rankingItem ${
+                      item.isCurrentUser ? "rankingItemCurrent" : ""
+                    }`}
+                    key={item.gakuseiId}
+                  >
+                    <span className={`rankingRank rankingRank-${item.rank}`}>
+                      {item.rank}
+                    </span>
+                    <Image
+                      src={avatar.image}
+                      alt=""
+                      className="rankingAvatar"
+                      aria-hidden="true"
+                    />
+                    <div className="rankingMeta">
+                      <h3>{item.displayName}</h3>
+                      <p>{item.isCurrentUser ? "あなた" : item.note}</p>
+                    </div>
+                    <strong>{formatStudyMinutes(item.weekMinutes)}</strong>
+                  </article>
+                );
+              })}
+            </section>
+          </div>
+
+          <nav className="timerBottomNav" aria-label="下部ナビゲーション">
+            <button
+              className="timerNavItem"
+              type="button"
+              onClick={() => setActiveScreen("timer")}
+            >
+              <span aria-hidden="true">⏱</span>
+              タイマー
+            </button>
             <button className="timerNavItem" type="button">
+              <span aria-hidden="true">📋</span>
+              問題
+            </button>
+            <button
+              className="timerNavItem"
+              type="button"
+              onClick={() => setActiveScreen("record")}
+            >
+              <span aria-hidden="true">⌛</span>
+              タイム
+            </button>
+            <button className="timerNavItem" type="button">
+              <span aria-hidden="true">▣</span>
+              カード
+            </button>
+            <button className="timerNavItem timerNavItemActive" type="button">
               <span aria-hidden="true">👥</span>
               交流
             </button>
@@ -1136,6 +1310,10 @@ export function HomeScreen() {
 
                   if (item.title === "勉強時間") {
                     setActiveScreen("record");
+                  }
+
+                  if (item.title === "交流") {
+                    setActiveScreen("ranking");
                   }
                 }}
               >

@@ -870,6 +870,136 @@ button {
   outline-offset: 1px;
 }
 
+.rankingScreen {
+  display: flex;
+  flex-direction: column;
+  background-position: center top;
+}
+
+.rankingContent {
+  display: grid;
+  flex: 1;
+  align-content: start;
+  gap: 12px;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 20px 16px 88px;
+  -webkit-overflow-scrolling: touch;
+}
+
+.rankingIntroCard {
+  display: grid;
+  gap: 4px;
+  border: 1px solid #e5e5ea;
+  border-radius: 16px;
+  padding: 16px;
+  background: #fff;
+}
+
+.rankingIntroCard h2 {
+  margin: 0;
+  color: #1d1d1f;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.rankingIntroCard p {
+  margin: 0;
+  color: #6e6e73;
+  font-size: 13px;
+}
+
+.rankingList {
+  display: grid;
+  gap: 10px;
+}
+
+.rankingItem {
+  display: grid;
+  grid-template-columns: 24px 48px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  min-height: 72px;
+  border: 1px solid #e5e5ea;
+  border-radius: 14px;
+  padding: 0 14px;
+  background: #fff;
+}
+
+.rankingItemCurrent {
+  border-color: #60a5fa;
+  background: #eff6ff;
+}
+
+.rankingRank {
+  color: #8e8e93;
+  font-size: 18px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.rankingRank-1 {
+  color: #ff9500;
+}
+
+.rankingRank-2 {
+  color: #8e8e93;
+}
+
+.rankingRank-3 {
+  color: #af7a3d;
+}
+
+.rankingAvatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 999px;
+  object-fit: cover;
+}
+
+.rankingMeta {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.rankingMeta h3 {
+  overflow: hidden;
+  margin: 0;
+  color: #1d1d1f;
+  font-size: 16px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rankingMeta p {
+  overflow: hidden;
+  margin: 0;
+  color: #8e8e93;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rankingItem strong {
+  color: #1d1d1f;
+  font-size: 16px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.rankingEmptyText {
+  margin: 0;
+  border: 1px solid #e5e5ea;
+  border-radius: 14px;
+  padding: 18px;
+  background: #fff;
+  color: #6e6e73;
+  font-size: 13px;
+  text-align: center;
+}
+
 .examCountdown {
   display: grid;
   gap: 6px;
