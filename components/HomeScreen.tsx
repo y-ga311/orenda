@@ -6,6 +6,20 @@ import backgroundImage from "@/source-images/background.png";
 import buttonImage from "@/source-images/button.png";
 import characterImage from "@/source-images/character01.png";
 import logoImage from "@/source-images/logo01.png";
+import byouriImage from "@/source-images/byouri.png";
+import eiseiImage from "@/source-images/eisei.png";
+import hariImage from "@/source-images/hari.png";
+import iryogaironImage from "@/source-images/iryogairon.png";
+import kaibouImage from "@/source-images/kaibou.png";
+import kakuronImage from "@/source-images/kakuron.png";
+import kankeihoukiImage from "@/source-images/kankeihouki.png";
+import keiketuImage from "@/source-images/keiketu.png";
+import kyuImage from "@/source-images/kyu.png";
+import rehaImage from "@/source-images/reha.png";
+import seiriImage from "@/source-images/seiri.png";
+import souronImage from "@/source-images/souron.png";
+import tougaiImage from "@/source-images/tougai.png";
+import tourinImage from "@/source-images/tourin.png";
 import { avatarIcons, type AvatarIconId } from "@/lib/avatarIcons";
 
 const menuItems = [
@@ -45,6 +59,23 @@ const menuItems = [
     description: "マイページの編集",
     tone: "blue",
   },
+];
+
+const studySubjects = [
+  { title: "解剖学", image: kaibouImage },
+  { title: "生理学", image: seiriImage },
+  { title: "病理学概論", image: byouriImage },
+  { title: "臨床医学総論", image: souronImage },
+  { title: "臨床医学各論", image: kakuronImage },
+  { title: "リハビリテーション医学", image: rehaImage },
+  { title: "東洋医学概論", image: tougaiImage },
+  { title: "経絡経穴概論", image: keiketuImage },
+  { title: "東洋医学臨床論", image: tourinImage },
+  { title: "はり理論", image: hariImage },
+  { title: "きゅう理論", image: kyuImage },
+  { title: "医療概論", image: iryogaironImage },
+  { title: "衛生学・公衆衛生学", image: eiseiImage },
+  { title: "関係法規", image: kankeihoukiImage },
 ];
 
 function PasswordVisibilityIcon({ isVisible }: { isVisible: boolean }) {
@@ -133,6 +164,7 @@ export function HomeScreen() {
   const [isLoggedInPreview, setIsLoggedInPreview] = useState(false);
   const [needsProfileSetup, setNeedsProfileSetup] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [activeScreen, setActiveScreen] = useState<"menu" | "timer">("menu");
 
   async function handleLogin(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -180,6 +212,7 @@ export function HomeScreen() {
     setDaysUntilExam(result?.student?.daysUntilExam ?? null);
     setSelectedAvatarIconId(result?.student?.avatarIconId ?? "pixel01");
     setNeedsProfileSetup(Boolean(result?.student?.needsProfileSetup));
+    setActiveScreen("menu");
     setIsLoginOpen(false);
     setIsLoggedInPreview(true);
     setPassword("");
@@ -226,6 +259,25 @@ export function HomeScreen() {
     setNickname(result?.student?.nickname ?? nickname);
     setSelectedAvatarIconId(result?.student?.avatarIconId ?? selectedAvatarIconId);
     setNeedsProfileSetup(false);
+  }
+
+  async function handleLogout() {
+    await fetch("/api/logout", {
+      method: "POST",
+    }).catch(() => null);
+
+    setIsLoggedInPreview(false);
+    setActiveScreen("menu");
+    setNeedsProfileSetup(false);
+    setIsLoginOpen(false);
+    setLoginId("");
+    setPassword("");
+    setStudentName("");
+    setNickname("");
+    setDaysUntilExam(null);
+    setSelectedAvatarIconId("pixel01");
+    setMessage("");
+    setProfileMessage("");
   }
 
   if (isLoggedInPreview && needsProfileSetup) {
@@ -309,6 +361,87 @@ export function HomeScreen() {
     );
   }
 
+  if (isLoggedInPreview && activeScreen === "timer") {
+    return (
+      <main className="appShell">
+        <section
+          className="phoneFrame timerScreen"
+          aria-label="学習タイマー 科目選択画面"
+          style={{ backgroundImage: `url(${backgroundImage.src})` }}
+        >
+          <header className="timerHeader">
+            <button
+              className="timerBackButton"
+              type="button"
+              onClick={() => setActiveScreen("menu")}
+            >
+              <span aria-hidden="true">‹</span>
+              戻る
+            </button>
+            <h1>学習タイマー</h1>
+            <span className="timerHeaderBalance" aria-hidden="true" />
+          </header>
+
+          <div className="timerContent">
+            <section className="timerSummary" aria-label="学習時間サマリー">
+              <div>
+                <span>今日</span>
+                <strong>2時間35分</strong>
+              </div>
+              <i aria-hidden="true" />
+              <div>
+                <span>今月</span>
+                <strong>42時間</strong>
+              </div>
+              <i aria-hidden="true" />
+              <div>
+                <span>総学習時間</span>
+                <strong>186時間</strong>
+              </div>
+            </section>
+
+            <p className="timerScrollHint">
+              <span aria-hidden="true">⇅</span>
+              上下にスクロールして科目を選べます
+            </p>
+
+            <section className="subjectGrid" aria-label="科目一覧">
+              {studySubjects.map((subject) => (
+                <button className="subjectCard" key={subject.title} type="button">
+                  <Image src={subject.image} alt="" className="subjectCover" />
+                  <span>{subject.title}</span>
+                </button>
+              ))}
+            </section>
+          </div>
+
+          <nav className="timerBottomNav" aria-label="下部ナビゲーション">
+            <button className="timerNavItem timerNavItemActive" type="button">
+              <span aria-hidden="true">⏱</span>
+              タイマー
+            </button>
+            <button className="timerNavItem" type="button">
+              <span aria-hidden="true">📋</span>
+              問題
+            </button>
+            <button className="timerNavItem" type="button">
+              <span aria-hidden="true">⌛</span>
+              タイム
+            </button>
+            <button className="timerNavItem" type="button">
+              <span aria-hidden="true">▣</span>
+              カード
+            </button>
+            <button className="timerNavItem" type="button">
+              <span aria-hidden="true">👥</span>
+              交流
+            </button>
+          </nav>
+        </section>
+      </main>
+    );
+  }
+
   if (isLoggedInPreview) {
     return (
       <main className="appShell">
@@ -324,9 +457,14 @@ export function HomeScreen() {
               className="menuLogo"
               priority
             />
-            <p className="studentName" aria-label="ログイン中のユーザー名">
-              {nickname || studentName ? `${nickname || studentName}さん` : ""}
-            </p>
+            <div className="menuUserActions">
+              <p className="studentName" aria-label="ログイン中のユーザー名">
+                {nickname || studentName ? `${nickname || studentName}さん` : ""}
+              </p>
+              <button className="logoutButton" type="button" onClick={handleLogout}>
+                ログアウト
+              </button>
+            </div>
           </header>
 
           <section className="examCountdown" aria-label="国家試験カウントダウン">
@@ -345,7 +483,16 @@ export function HomeScreen() {
 
           <nav className="menuList" aria-label="学習管理メニュー">
             {menuItems.map((item) => (
-              <button className="menuItem" key={item.title} type="button">
+              <button
+                className="menuItem"
+                key={item.title}
+                type="button"
+                onClick={() => {
+                  if (item.title === "学習タイマー") {
+                    setActiveScreen("timer");
+                  }
+                }}
+              >
                 <span className={`menuIcon menuIcon-${item.tone}`} aria-hidden="true">
                   {item.icon}
                 </span>
