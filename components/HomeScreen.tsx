@@ -164,18 +164,30 @@ type StudyRecordData = {
 };
 
 type StudyRankingItem = {
-  avatarIconId: AvatarIconId;
+  avatarIconId: string;
+  className: string | null;
   displayName: string;
   gakuseiId: string;
   isCurrentUser: boolean;
   note: string;
-  rank: number;
-  weekMinutes: number;
+  rank: number | null;
+  totalMinutes: number;
 };
 
+const rankingPeriodOptions = [
+  { id: "week", label: "今週", title: "今週の勉強時間ランキング" },
+  { id: "month", label: "今月", title: "今月の勉強時間ランキング" },
+  { id: "year", label: "今年", title: "今年の勉強時間ランキング" },
+  { id: "total", label: "総合", title: "総学習時間ランキング" },
+] as const;
+
+type RankingPeriod = (typeof rankingPeriodOptions)[number]["id"];
+
 type StudyRankingData = {
+  currentUser: StudyRankingItem | null;
+  period: RankingPeriod;
   ranking: StudyRankingItem[];
-  week: {
+  range: {
     endDate: string;
     startDate: string;
   };
@@ -328,6 +340,8 @@ export function HomeScreen() {
   const [studyRanking, setStudyRanking] = useState<StudyRankingData | null>(null);
   const [selectedRecordPeriod, setSelectedRecordPeriod] =
     useState<RecordPeriod>("month");
+  const [selectedRankingPeriod, setSelectedRankingPeriod] =
+    useState<RankingPeriod>("week");
   const [isStudySummaryLoading, setIsStudySummaryLoading] = useState(false);
   const [isStudyRankingLoading, setIsStudyRankingLoading] = useState(false);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
@@ -437,7 +451,10 @@ export function HomeScreen() {
     async function loadStudyRanking() {
       setIsStudyRankingLoading(true);
 
-      const response = await fetch("/api/study-ranking").catch(() => null);
+      const params = new URLSearchParams({
+        period: selectedRankingPeriod,
+      });
+      const response = await fetch(`/api/study-ranking?${params}`).catch(() => null);
 
       if (!isMounted) {
         return;
@@ -465,7 +482,7 @@ export function HomeScreen() {
     return () => {
       isMounted = false;
     };
-  }, [activeScreen, isLoggedInPreview]);
+  }, [activeScreen, isLoggedInPreview, selectedRankingPeriod]);
 
   useEffect(() => {
     if (!isStopwatchRunning) {
@@ -601,6 +618,7 @@ export function HomeScreen() {
     setStudyRecord(null);
     setStudyRanking(null);
     setSelectedRecordPeriod("month");
+    setSelectedRankingPeriod("week");
     setRecordCalendarMonth(getCurrentJapanYearMonth());
     setSelectedAvatarIconId("pixel01");
     setMessage("");
@@ -1154,6 +1172,10 @@ export function HomeScreen() {
   }
 
   if (isLoggedInPreview && activeScreen === "ranking") {
+    const selectedRankingOption =
+      rankingPeriodOptions.find((option) => option.id === selectedRankingPeriod) ??
+      rankingPeriodOptions[0];
+    const currentRankingItem = studyRanking?.currentUser ?? null;
     const rankingItems = studyRanking?.ranking ?? [];
 
     return (
@@ -1178,11 +1200,55 @@ export function HomeScreen() {
 
           <div className="rankingContent">
             <section className="rankingIntroCard">
-              <h2>今週の勉強時間ランキング</h2>
+              <h2>{selectedRankingOption.title}</h2>
               <p>他のユーザーの学習量をチェックしよう</p>
+              <div className="rankingPeriodTabs" aria-label="ランキング期間">
+                {rankingPeriodOptions.map((option) => (
+                  <button
+                    className={
+                      selectedRankingPeriod === option.id
+                        ? "rankingPeriodTab rankingPeriodTabActive"
+                        : "rankingPeriodTab"
+                    }
+                    key={option.id}
+                    type="button"
+                    onClick={() => setSelectedRankingPeriod(option.id)}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
             </section>
 
-            <section className="rankingList" aria-label="今週のランキング">
+            <section className="rankingCurrentCard" aria-label="あなたのランキング">
+              <h2>あなたの順位</h2>
+              {currentRankingItem ? (
+                <article className="rankingItem rankingItemCurrent rankingItemFeatured">
+                  <span className="rankingRank">
+                    {currentRankingItem.rank ? `${currentRankingItem.rank}` : "-"}
+                  </span>
+                  <Image
+                    src={getAvatarIcon(currentRankingItem.avatarIconId).image}
+                    alt=""
+                    className="rankingAvatar"
+                    aria-hidden="true"
+                  />
+                  <div className="rankingMeta">
+                    <h3>{currentRankingItem.displayName}</h3>
+                    <p>
+                      {currentRankingItem.className ?? "クラス未設定"}・
+                      {currentRankingItem.note}
+                    </p>
+                  </div>
+                  <strong>{formatStudyMinutes(currentRankingItem.totalMinutes)}</strong>
+                </article>
+              ) : (
+                <p className="rankingEmptyText">あなたの情報を取得できませんでした。</p>
+              )}
+            </section>
+
+            <section className="rankingList" aria-label="上位10名ランキング">
+              <h2>上位10名</h2>
               {isStudyRankingLoading ? (
                 <p className="rankingEmptyText">ランキングを読み込んでいます。</p>
               ) : null}
@@ -1198,13 +1264,11 @@ export function HomeScreen() {
 
                 return (
                   <article
-                    className={`rankingItem ${
-                      item.isCurrentUser ? "rankingItemCurrent" : ""
-                    }`}
+                    className="rankingItem"
                     key={item.gakuseiId}
                   >
                     <span className={`rankingRank rankingRank-${item.rank}`}>
-                      {item.rank}
+                      {item.rank ?? "-"}
                     </span>
                     <Image
                       src={avatar.image}
@@ -1214,9 +1278,12 @@ export function HomeScreen() {
                     />
                     <div className="rankingMeta">
                       <h3>{item.displayName}</h3>
-                      <p>{item.isCurrentUser ? "あなた" : item.note}</p>
+                      <p>
+                        {item.className ?? "クラス未設定"}・
+                        {item.isCurrentUser ? "あなた" : item.note}
+                      </p>
                     </div>
-                    <strong>{formatStudyMinutes(item.weekMinutes)}</strong>
+                    <strong>{formatStudyMinutes(item.totalMinutes)}</strong>
                   </article>
                 );
               })}

@@ -10,12 +10,28 @@ type StudySession = {
   studied_at: string | null;
 };
 
+type RankingPeriod = "week" | "month" | "year" | "total";
+
 type Student = {
   avatar_icon_id: string | null;
+  class: string | null;
   gakusei_id: string;
   name: string | null;
   nickname: string | null;
 };
+
+type RankingStudent = {
+  avatarIconId: string;
+  className: string | null;
+  displayName: string;
+  gakuseiId: string;
+  isCurrentUser: boolean;
+  note: string;
+  rank: number | null;
+  totalMinutes: number;
+};
+
+const rankingPeriods: RankingPeriod[] = ["week", "month", "year", "total"];
 
 function getJapanDateParts(date = new Date()) {
   const formatter = new Intl.DateTimeFormat("en-CA", {
@@ -51,15 +67,42 @@ function getJapanDateKey(dateIso: string) {
     .padStart(2, "0")}`;
 }
 
-function formatWeekStudyDays(dateKeys: Set<string>) {
+function formatStudyDays(dateKeys: Set<string>) {
   if (dateKeys.size <= 0) {
-    return "今週の学習記録なし";
+    return "学習記録なし";
   }
 
-  return `今週 ${dateKeys.size}日学習`;
+  return `${dateKeys.size}日学習`;
 }
 
-export async function GET() {
+function buildRankingStudent({
+  currentStudentId,
+  minutesByStudent,
+  rank,
+  student,
+  studyDateKeysByStudent,
+}: {
+  currentStudentId: string;
+  minutesByStudent: Map<string, number>;
+  rank: number | null;
+  student: Student;
+  studyDateKeysByStudent: Map<string, Set<string>>;
+}): RankingStudent {
+  const studyDateKeys = studyDateKeysByStudent.get(student.gakusei_id) ?? new Set<string>();
+
+  return {
+    rank,
+    gakuseiId: student.gakusei_id,
+    displayName: student.nickname || student.name || "未設定",
+    avatarIconId: student.avatar_icon_id ?? "pixel01",
+    className: student.class,
+    totalMinutes: minutesByStudent.get(student.gakusei_id) ?? 0,
+    note: formatStudyDays(studyDateKeys),
+    isCurrentUser: student.gakusei_id === currentStudentId,
+  };
+}
+
+export async function GET(request: Request) {
   const cookieStore = await cookies();
   const currentStudentId = cookieStore.get("orenda_student_id")?.value;
 
@@ -88,6 +131,11 @@ export async function GET() {
   });
 
   const today = getJapanDateParts();
+  const url = new URL(request.url);
+  const requestedPeriod = url.searchParams.get("period");
+  const period: RankingPeriod = rankingPeriods.includes(requestedPeriod as RankingPeriod)
+    ? (requestedPeriod as RankingPeriod)
+    : "week";
   const dayOfWeek = new Date(Date.UTC(today.year, today.month - 1, today.day)).getUTCDay();
   const weekStart = addDaysToJapanDate(
     today.year,
@@ -96,14 +144,39 @@ export async function GET() {
     -((dayOfWeek + 6) % 7),
   );
   const weekEnd = addDaysToJapanDate(weekStart.year, weekStart.month, weekStart.day, 7);
+  const nextMonth =
+    today.month === 12
+      ? { year: today.year + 1, month: 1, day: 1 }
+      : { year: today.year, month: today.month + 1, day: 1 };
+  const nextYear = { year: today.year + 1, month: 1, day: 1 };
   const weekStartIso = getJapanBoundaryIso(weekStart.year, weekStart.month, weekStart.day);
   const weekEndIso = getJapanBoundaryIso(weekEnd.year, weekEnd.month, weekEnd.day);
+  const monthStartIso = getJapanBoundaryIso(today.year, today.month, 1);
+  const nextMonthStartIso = getJapanBoundaryIso(
+    nextMonth.year,
+    nextMonth.month,
+    nextMonth.day,
+  );
+  const yearStartIso = getJapanBoundaryIso(today.year, 1, 1);
+  const nextYearStartIso = getJapanBoundaryIso(nextYear.year, nextYear.month, nextYear.day);
+  const periodRange = {
+    week: { startIso: weekStartIso, endIso: weekEndIso },
+    month: { startIso: monthStartIso, endIso: nextMonthStartIso },
+    year: { startIso: yearStartIso, endIso: nextYearStartIso },
+    total: { startIso: null, endIso: null },
+  }[period];
 
-  const { data: sessions, error: sessionsError } = await supabase
+  let sessionsQuery = supabase
     .from("study_sessions")
-    .select("gakusei_id, duration_minutes, studied_at")
-    .gte("studied_at", weekStartIso)
-    .lt("studied_at", weekEndIso);
+    .select("gakusei_id, duration_minutes, studied_at");
+
+  if (periodRange.startIso && periodRange.endIso) {
+    sessionsQuery = sessionsQuery
+      .gte("studied_at", periodRange.startIso)
+      .lt("studied_at", periodRange.endIso);
+  }
+
+  const { data: sessions, error: sessionsError } = await sessionsQuery;
 
   if (sessionsError) {
     return NextResponse.json(
@@ -133,27 +206,14 @@ export async function GET() {
 
   const rankedStudentIds = [...minutesByStudent.entries()]
     .sort((a, b) => b[1] - a[1])
-    .map(([studentId]) => studentId)
-    .slice(0, 10);
-
-  if (rankedStudentIds.length === 0) {
-    return NextResponse.json({
-      ranking: [],
-      week: {
-        startDate: `${weekStart.year}-${weekStart.month
-          .toString()
-          .padStart(2, "0")}-${weekStart.day.toString().padStart(2, "0")}`,
-        endDate: `${weekEnd.year}-${weekEnd.month
-          .toString()
-          .padStart(2, "0")}-${weekEnd.day.toString().padStart(2, "0")}`,
-      },
-    });
-  }
+    .map(([studentId]) => studentId);
+  const topStudentIds = rankedStudentIds.slice(0, 10);
+  const studentIdsToFetch = [...new Set([...topStudentIds, currentStudentId])];
 
   const { data: students, error: studentsError } = await supabase
     .from("students")
-    .select("gakusei_id, name, nickname, avatar_icon_id")
-    .in("gakusei_id", rankedStudentIds);
+    .select("gakusei_id, name, nickname, avatar_icon_id, class")
+    .in("gakusei_id", studentIdsToFetch);
 
   if (studentsError) {
     return NextResponse.json(
@@ -165,23 +225,40 @@ export async function GET() {
   const studentById = new Map(
     ((students ?? []) as Student[]).map((student) => [student.gakusei_id, student]),
   );
+  const rankByStudentId = new Map(
+    rankedStudentIds.map((studentId, index) => [studentId, index + 1]),
+  );
+  const currentStudent = studentById.get(currentStudentId);
 
   return NextResponse.json({
-    ranking: rankedStudentIds.map((studentId, index) => {
+    currentUser: currentStudent
+      ? buildRankingStudent({
+          currentStudentId,
+          minutesByStudent,
+          rank: rankByStudentId.get(currentStudentId) ?? null,
+          student: currentStudent,
+          studyDateKeysByStudent,
+        })
+      : null,
+    ranking: topStudentIds.flatMap((studentId) => {
       const student = studentById.get(studentId);
-      const studyDateKeys = studyDateKeysByStudent.get(studentId) ?? new Set<string>();
 
-      return {
-        rank: index + 1,
-        gakuseiId: studentId,
-        displayName: student?.nickname || student?.name || "未設定",
-        avatarIconId: student?.avatar_icon_id ?? "pixel01",
-        weekMinutes: minutesByStudent.get(studentId) ?? 0,
-        note: formatWeekStudyDays(studyDateKeys),
-        isCurrentUser: studentId === currentStudentId,
-      };
+      if (!student) {
+        return [];
+      }
+
+      return [
+        buildRankingStudent({
+          currentStudentId,
+          minutesByStudent,
+          rank: rankByStudentId.get(studentId) ?? null,
+          student,
+          studyDateKeysByStudent,
+        }),
+      ];
     }),
-    week: {
+    period,
+    range: {
       startDate: `${weekStart.year}-${weekStart.month
         .toString()
         .padStart(2, "0")}-${weekStart.day.toString().padStart(2, "0")}`,
