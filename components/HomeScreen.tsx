@@ -126,6 +126,43 @@ type StudySummary = {
   totalMinutes: number;
 };
 
+const recordPeriodOptions = [
+  { id: "today", label: "今日", title: "今日の学習時間" },
+  { id: "week", label: "週間", title: "週間の学習時間" },
+  { id: "month", label: "月間", title: "月間の学習時間" },
+  { id: "year", label: "年間", title: "年間の学習時間" },
+  { id: "total", label: "総時間", title: "総学習時間" },
+] as const;
+
+type RecordPeriod = (typeof recordPeriodOptions)[number]["id"];
+
+type StudyRecordData = {
+  summary: StudySummary;
+  selectedPeriod: RecordPeriod;
+  periodSummary: {
+    averageMinutes: number;
+    studiedDays: number;
+    totalMinutes: number;
+  };
+  subjectBreakdown: {
+    color: string;
+    minutes: number;
+    percentage: number;
+    subjectName: string;
+  }[];
+  calendar: {
+    year: number;
+    month: number;
+    days: {
+      date: string;
+      day: number;
+      isCurrentMonth: boolean;
+      isToday: boolean;
+      minutes: number;
+    }[];
+  };
+};
+
 function formatStudyMinutes(minutes: number) {
   const hours = Math.floor(minutes / 60);
   const restMinutes = minutes % 60;
@@ -149,6 +186,26 @@ function formatStopwatchTime(totalSeconds: number) {
   return [hours, minutes, seconds]
     .map((value) => value.toString().padStart(2, "0"))
     .join(":");
+}
+
+function getCurrentJapanYearMonth() {
+  const formatter = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Tokyo",
+    year: "numeric",
+    month: "2-digit",
+  });
+  const [year, month] = formatter.format(new Date()).split("-").map(Number);
+
+  return { year, month };
+}
+
+function addMonths(year: number, month: number, amount: number) {
+  const date = new Date(Date.UTC(year, month - 1 + amount, 1));
+
+  return {
+    year: date.getUTCFullYear(),
+    month: date.getUTCMonth() + 1,
+  };
 }
 
 function PasswordVisibilityIcon({ isVisible }: { isVisible: boolean }) {
@@ -222,6 +279,9 @@ function PasswordVisibilityIcon({ isVisible }: { isVisible: boolean }) {
 }
 
 export function HomeScreen() {
+  const [recordCalendarMonth, setRecordCalendarMonth] = useState(
+    getCurrentJapanYearMonth,
+  );
   const [isLoginOpen, setIsLoginOpen] = useState(false);
   const [loginId, setLoginId] = useState("");
   const [password, setPassword] = useState("");
@@ -237,15 +297,18 @@ export function HomeScreen() {
   const [isLoggedInPreview, setIsLoggedInPreview] = useState(false);
   const [needsProfileSetup, setNeedsProfileSetup] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const [activeScreen, setActiveScreen] = useState<"menu" | "timer" | "stopwatch">(
-    "menu",
-  );
+  const [activeScreen, setActiveScreen] = useState<
+    "menu" | "timer" | "stopwatch" | "record"
+  >("menu");
   const [selectedSubject, setSelectedSubject] = useState<StudySubject | null>(null);
   const [studySummary, setStudySummary] = useState<StudySummary>({
     todayMinutes: 0,
     monthMinutes: 0,
     totalMinutes: 0,
   });
+  const [studyRecord, setStudyRecord] = useState<StudyRecordData | null>(null);
+  const [selectedRecordPeriod, setSelectedRecordPeriod] =
+    useState<RecordPeriod>("month");
   const [isStudySummaryLoading, setIsStudySummaryLoading] = useState(false);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [isStopwatchRunning, setIsStopwatchRunning] = useState(false);
@@ -295,6 +358,54 @@ export function HomeScreen() {
       isMounted = false;
     };
   }, [activeScreen, isLoggedInPreview]);
+
+  useEffect(() => {
+    if (!isLoggedInPreview || activeScreen !== "record") {
+      return;
+    }
+
+    let isMounted = true;
+
+    async function loadStudyRecord() {
+      const params = new URLSearchParams({
+        year: recordCalendarMonth.year.toString(),
+        month: recordCalendarMonth.month.toString(),
+        period: selectedRecordPeriod,
+      });
+      const response = await fetch(`/api/study-records?${params}`).catch(() => null);
+
+      if (!isMounted) {
+        return;
+      }
+
+      if (!response?.ok) {
+        return;
+      }
+
+      const result = (await response.json().catch(() => null)) as
+        | StudyRecordData
+        | null;
+
+      if (!result) {
+        return;
+      }
+
+      setStudyRecord(result);
+      setStudySummary(result.summary);
+    }
+
+    void loadStudyRecord();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [
+    activeScreen,
+    isLoggedInPreview,
+    recordCalendarMonth.month,
+    recordCalendarMonth.year,
+    selectedRecordPeriod,
+  ]);
 
   useEffect(() => {
     if (!isStopwatchRunning) {
@@ -427,6 +538,9 @@ export function HomeScreen() {
       monthMinutes: 0,
       totalMinutes: 0,
     });
+    setStudyRecord(null);
+    setSelectedRecordPeriod("month");
+    setRecordCalendarMonth(getCurrentJapanYearMonth());
     setSelectedAvatarIconId("pixel01");
     setMessage("");
     setProfileMessage("");
@@ -446,10 +560,10 @@ export function HomeScreen() {
       return;
     }
 
-    const durationMinutes = Math.ceil(elapsedSeconds / 60);
+    const durationMinutes = Math.floor(elapsedSeconds / 60);
 
     if (durationMinutes < 1) {
-      setStopwatchMessage("1分以上の学習時間を登録してください。");
+      setStopwatchMessage("1分以上学習してから登録してください。");
       return;
     }
 
@@ -650,7 +764,11 @@ export function HomeScreen() {
               <span aria-hidden="true">📋</span>
               問題
             </button>
-            <button className="timerNavItem" type="button">
+            <button
+              className="timerNavItem"
+              type="button"
+              onClick={() => setActiveScreen("record")}
+            >
               <span aria-hidden="true">⌛</span>
               タイム
             </button>
@@ -764,6 +882,208 @@ export function HomeScreen() {
     );
   }
 
+  if (isLoggedInPreview && activeScreen === "record") {
+    const selectedPeriodOption =
+      recordPeriodOptions.find((option) => option.id === selectedRecordPeriod) ??
+      recordPeriodOptions[2];
+    const calendarWeeks = Array.from({ length: 6 }, (_, weekIndex) => {
+      return studyRecord?.calendar.days.slice(weekIndex * 7, weekIndex * 7 + 7) ?? [];
+    });
+    const periodSummary = studyRecord?.periodSummary ?? {
+      averageMinutes: 0,
+      studiedDays: 0,
+      totalMinutes: 0,
+    };
+
+    return (
+      <main className="appShell">
+        <section
+          className="phoneFrame recordScreen"
+          aria-label="学習記録画面"
+          style={{ backgroundImage: `url(${backgroundImage.src})` }}
+        >
+          <header className="timerHeader">
+            <button
+              className="timerBackButton"
+              type="button"
+              onClick={() => setActiveScreen("menu")}
+            >
+              <span aria-hidden="true">‹</span>
+              戻る
+            </button>
+            <h1>学習記録</h1>
+            <span className="timerHeaderBalance" aria-hidden="true" />
+          </header>
+
+          <div className="recordContent">
+            <h2 className="recordPageTitle">学習推移</h2>
+
+            <section className="recordCard" aria-label="期間別の学習時間">
+              <h3>{selectedPeriodOption.title}</h3>
+              <div className="recordPeriodTabs" aria-label="表示する期間">
+                {recordPeriodOptions.map((option) => (
+                  <button
+                    className={
+                      selectedRecordPeriod === option.id
+                        ? "recordPeriodTab recordPeriodTabActive"
+                        : "recordPeriodTab"
+                    }
+                    key={option.id}
+                    type="button"
+                    onClick={() => setSelectedRecordPeriod(option.id)}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+
+              <div className="monthlyOverview">
+                <div className="monthlyOverviewMain">
+                  <span>合計</span>
+                  <strong>{formatStudyMinutes(periodSummary.totalMinutes)}</strong>
+                </div>
+                <div>
+                  <span>学習日数</span>
+                  <strong>{periodSummary.studiedDays}日</strong>
+                </div>
+                <div>
+                  <span>1日平均</span>
+                  <strong>{formatStudyMinutes(periodSummary.averageMinutes)}</strong>
+                </div>
+              </div>
+
+              <h3>時間配分</h3>
+              <div className="studyBreakdown">
+                {studyRecord?.subjectBreakdown.length ? (
+                  studyRecord.subjectBreakdown.map((subject) => (
+                    <div className="studyBreakdownRow" key={subject.subjectName}>
+                      <div className="studyBreakdownHead">
+                        <span>
+                          <i
+                            className="studyBreakdownDot"
+                            style={{ backgroundColor: subject.color }}
+                            aria-hidden="true"
+                          />
+                          {subject.subjectName}
+                        </span>
+                        <strong>{formatStudyMinutes(subject.minutes)}</strong>
+                      </div>
+                      <div
+                        className="studyBreakdownTrack"
+                        aria-label={`${subject.subjectName} ${subject.percentage}%`}
+                      >
+                        <span
+                          style={{
+                            width: `${subject.percentage}%`,
+                            backgroundColor: subject.color,
+                          }}
+                        />
+                      </div>
+                      <small>選択期間の{subject.percentage}%</small>
+                    </div>
+                  ))
+                ) : (
+                  <p className="recordEmptyText">
+                    選択期間の学習時間を登録すると配分が表示されます。
+                  </p>
+                )}
+              </div>
+            </section>
+
+            <section className="recordCard calendarCard" aria-label="カレンダー">
+              <h3>カレンダー</h3>
+              <div className="calendarMonth">
+                <button
+                  type="button"
+                  onClick={() =>
+                    setRecordCalendarMonth((current) =>
+                      addMonths(current.year, current.month, -1),
+                    )
+                  }
+                  aria-label="前の月を表示"
+                >
+                  ‹
+                </button>
+                <strong>
+                  {studyRecord
+                    ? `${studyRecord.calendar.year}年${studyRecord.calendar.month}月`
+                    : "今月"}
+                </strong>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setRecordCalendarMonth((current) =>
+                      addMonths(current.year, current.month, 1),
+                    )
+                  }
+                  aria-label="次の月を表示"
+                >
+                  ›
+                </button>
+              </div>
+
+              <div className="calendarWeekdays" aria-hidden="true">
+                {["月", "火", "水", "木", "金", "土", "日"].map((day) => (
+                  <span key={day}>{day}</span>
+                ))}
+              </div>
+
+              <div className="calendarGrid">
+                {calendarWeeks.map((week, weekIndex) => (
+                  <div className="calendarWeek" key={weekIndex}>
+                    {week.map((day) => (
+                      <span
+                        className={[
+                          "calendarDay",
+                          day.isCurrentMonth ? "" : "calendarDayMuted",
+                          day.minutes > 0 ? "calendarDayStudied" : "",
+                          day.isToday ? "calendarDayToday" : "",
+                        ]
+                          .filter(Boolean)
+                          .join(" ")}
+                        key={day.date}
+                        title={`${day.date}: ${formatStudyMinutes(day.minutes)}`}
+                      >
+                        {day.day}
+                      </span>
+                    ))}
+                  </div>
+                ))}
+              </div>
+            </section>
+          </div>
+
+          <nav className="timerBottomNav" aria-label="下部ナビゲーション">
+            <button
+              className="timerNavItem"
+              type="button"
+              onClick={() => setActiveScreen("timer")}
+            >
+              <span aria-hidden="true">⏱</span>
+              タイマー
+            </button>
+            <button className="timerNavItem" type="button">
+              <span aria-hidden="true">📋</span>
+              問題
+            </button>
+            <button className="timerNavItem timerNavItemActive" type="button">
+              <span aria-hidden="true">⌛</span>
+              タイム
+            </button>
+            <button className="timerNavItem" type="button">
+              <span aria-hidden="true">▣</span>
+              カード
+            </button>
+            <button className="timerNavItem" type="button">
+              <span aria-hidden="true">👥</span>
+              交流
+            </button>
+          </nav>
+        </section>
+      </main>
+    );
+  }
+
   if (isLoggedInPreview) {
     return (
       <main className="appShell">
@@ -812,6 +1132,10 @@ export function HomeScreen() {
                 onClick={() => {
                   if (item.title === "学習タイマー") {
                     setActiveScreen("timer");
+                  }
+
+                  if (item.title === "勉強時間") {
+                    setActiveScreen("record");
                   }
                 }}
               >
