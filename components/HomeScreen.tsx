@@ -7,19 +7,33 @@ import buttonImage from "@/source-images/button.png";
 import characterImage from "@/source-images/character01.png";
 import logoImage from "@/source-images/logo01.png";
 import byouriImage from "@/source-images/byouri.png";
+import byouriCardImage from "@/source-images/byouri_card.png";
 import eiseiImage from "@/source-images/eisei.png";
+import eiseiCardImage from "@/source-images/eisei_card.png";
 import hariImage from "@/source-images/hari.png";
+import hariCardImage from "@/source-images/hari_card.png";
 import iryogaironImage from "@/source-images/iryogairon.png";
+import iryogaironCardImage from "@/source-images/iryogairon_card.png";
 import kaibouImage from "@/source-images/kaibou.png";
+import kaibouCardImage from "@/source-images/kaibou_card.png";
 import kakuronImage from "@/source-images/kakuron.png";
+import kakuronCardImage from "@/source-images/kakuron_card.png";
 import kankeihoukiImage from "@/source-images/kankeihouki.png";
+import kankeihoukiCardImage from "@/source-images/kankeihouki_card.png";
 import keiketuImage from "@/source-images/keiketu.png";
+import keiketuCardImage from "@/source-images/keiketu_card.png";
 import kyuImage from "@/source-images/kyu.png";
+import kyuCardImage from "@/source-images/kyu_card.png";
 import rehaImage from "@/source-images/reha.png";
+import rehaCardImage from "@/source-images/reha_card.png";
 import seiriImage from "@/source-images/seiri.png";
+import seiriCardImage from "@/source-images/seiri_card.png";
 import souronImage from "@/source-images/souron.png";
+import souronCardImage from "@/source-images/souron_card.png";
 import tougaiImage from "@/source-images/tougai.png";
+import tougaiCardImage from "@/source-images/tougai_card.png";
 import tourinImage from "@/source-images/tourin.png";
+import tourinCardImage from "@/source-images/tourin_card.png";
 import { avatarIcons, getAvatarIcon, type AvatarIconId } from "@/lib/avatarIcons";
 
 const menuItems = [
@@ -116,6 +130,23 @@ const studySubjects = [
     subjectName: "関係法規",
     image: kankeihoukiImage,
   },
+];
+
+const collectionCards = [
+  { title: "解剖学", image: kaibouCardImage },
+  { title: "生理学", image: seiriCardImage },
+  { title: "病理学概論", image: byouriCardImage },
+  { title: "臨床医学総論", image: souronCardImage },
+  { title: "臨床医学各論", image: kakuronCardImage },
+  { title: "リハビリテーション医学", image: rehaCardImage },
+  { title: "東洋医学概論", image: tougaiCardImage },
+  { title: "経絡経穴概論", image: keiketuCardImage },
+  { title: "東洋医学臨床論", image: tourinCardImage },
+  { title: "はり理論", image: hariCardImage },
+  { title: "きゅう理論", image: kyuCardImage },
+  { title: "医療概論", image: iryogaironCardImage },
+  { title: "衛生学", image: eiseiCardImage },
+  { title: "関係法規", image: kankeihoukiCardImage },
 ];
 
 type StudySubject = (typeof studySubjects)[number];
@@ -328,9 +359,12 @@ export function HomeScreen() {
   const [needsProfileSetup, setNeedsProfileSetup] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [activeScreen, setActiveScreen] = useState<
-    "menu" | "timer" | "stopwatch" | "record" | "ranking"
+    "menu" | "timer" | "stopwatch" | "record" | "ranking" | "collection"
   >("menu");
   const [selectedSubject, setSelectedSubject] = useState<StudySubject | null>(null);
+  const [selectedCollectionCard, setSelectedCollectionCard] = useState<
+    (typeof collectionCards)[number] | null
+  >(null);
   const [studySummary, setStudySummary] = useState<StudySummary>({
     todayMinutes: 0,
     monthMinutes: 0,
@@ -601,6 +635,7 @@ export function HomeScreen() {
     setIsLoggedInPreview(false);
     setActiveScreen("menu");
     setSelectedSubject(null);
+    setSelectedCollectionCard(null);
     setElapsedSeconds(0);
     setIsStopwatchRunning(false);
     setNeedsProfileSetup(false);
@@ -851,7 +886,11 @@ export function HomeScreen() {
               <span aria-hidden="true">⌛</span>
               タイム
             </button>
-            <button className="timerNavItem" type="button">
+            <button
+              className="timerNavItem"
+              type="button"
+              onClick={() => setActiveScreen("collection")}
+            >
               <span aria-hidden="true">▣</span>
               カード
             </button>
@@ -1153,7 +1192,11 @@ export function HomeScreen() {
               <span aria-hidden="true">⌛</span>
               タイム
             </button>
-            <button className="timerNavItem" type="button">
+            <button
+              className="timerNavItem"
+              type="button"
+              onClick={() => setActiveScreen("collection")}
+            >
               <span aria-hidden="true">▣</span>
               カード
             </button>
@@ -1311,7 +1354,11 @@ export function HomeScreen() {
               <span aria-hidden="true">⌛</span>
               タイム
             </button>
-            <button className="timerNavItem" type="button">
+            <button
+              className="timerNavItem"
+              type="button"
+              onClick={() => setActiveScreen("collection")}
+            >
               <span aria-hidden="true">▣</span>
               カード
             </button>
@@ -1320,6 +1367,159 @@ export function HomeScreen() {
               交流
             </button>
           </nav>
+        </section>
+      </main>
+    );
+  }
+
+  if (isLoggedInPreview && activeScreen === "collection") {
+    const cardSlots = Array.from({ length: 99 }, (_, index) => {
+      return collectionCards[index]
+        ? { ...collectionCards[index], slotNumber: index + 1, isOwned: true }
+        : { title: "", image: null, slotNumber: index + 1, isOwned: false };
+    });
+
+    return (
+      <main className="appShell">
+        <section className="phoneFrame collectionScreen" aria-label="コレクション画面">
+          <header className="collectionHeader">
+            <button
+              className="timerBackButton"
+              type="button"
+              onClick={() => setActiveScreen("menu")}
+            >
+              <span aria-hidden="true">‹</span>
+              戻る
+            </button>
+            <h1>コレクション</h1>
+            <span className="timerHeaderBalance" aria-hidden="true" />
+          </header>
+
+          <div className="collectionContent">
+            <section className="collectionPanel">
+              <h2>勉強カードを集めよう!</h2>
+
+              <div className="collectionSubHeader">
+                <h3>Myカード</h3>
+                <span aria-hidden="true">ⓘ</span>
+              </div>
+
+              <div className="collectionTabs" aria-label="カードメニュー">
+                <button className="collectionTab" type="button">
+                  <span aria-hidden="true">▣</span>
+                  コレクション
+                </button>
+                <button className="collectionTab" type="button">
+                  <span aria-hidden="true">✦</span>
+                  ガチャ
+                </button>
+                <button className="collectionTab" type="button">
+                  <span aria-hidden="true">♕</span>
+                  メダル
+                </button>
+              </div>
+
+              <div className="collectionSummary">
+                <span className="collectionSummaryIcon" aria-hidden="true">▣</span>
+                <strong>すべてのカード</strong>
+                <small>{collectionCards.length}/99</small>
+              </div>
+
+              <section className="collectionGrid" aria-label="カード一覧">
+                {cardSlots.map((card) => (
+                  card.image ? (
+                    <button
+                      className="collectionCardSlot collectionCardSlotOwned"
+                      key={card.slotNumber}
+                      type="button"
+                      onClick={() =>
+                        setSelectedCollectionCard({
+                          title: card.title,
+                          image: card.image,
+                        })
+                      }
+                    >
+                      <Image
+                        src={card.image}
+                        alt={card.title}
+                        className="collectionCardImage"
+                      />
+                    </button>
+                  ) : (
+                    <div className="collectionCardSlot" key={card.slotNumber}>
+                      <span>{card.slotNumber}</span>
+                    </div>
+                  )
+                ))}
+              </section>
+            </section>
+          </div>
+
+          <nav className="timerBottomNav" aria-label="下部ナビゲーション">
+            <button
+              className="timerNavItem"
+              type="button"
+              onClick={() => setActiveScreen("timer")}
+            >
+              <span aria-hidden="true">⏱</span>
+              タイマー
+            </button>
+            <button className="timerNavItem" type="button">
+              <span aria-hidden="true">📋</span>
+              問題
+            </button>
+            <button
+              className="timerNavItem"
+              type="button"
+              onClick={() => setActiveScreen("record")}
+            >
+              <span aria-hidden="true">⌛</span>
+              タイム
+            </button>
+            <button className="timerNavItem timerNavItemActive" type="button">
+              <span aria-hidden="true">▣</span>
+              カード
+            </button>
+            <button
+              className="timerNavItem"
+              type="button"
+              onClick={() => setActiveScreen("ranking")}
+            >
+              <span aria-hidden="true">👥</span>
+              交流
+            </button>
+          </nav>
+
+          {selectedCollectionCard ? (
+            <div
+              className="collectionZoomOverlay"
+              role="dialog"
+              aria-modal="true"
+              aria-label={`${selectedCollectionCard.title} のカード詳細`}
+              onClick={() => setSelectedCollectionCard(null)}
+            >
+              <button
+                className="collectionZoomClose"
+                type="button"
+                aria-label="カードを閉じる"
+                onClick={() => setSelectedCollectionCard(null)}
+              >
+                ×
+              </button>
+              <div
+                className="collectionZoomCard"
+                role="presentation"
+                onClick={(event) => event.stopPropagation()}
+              >
+                <Image
+                  src={selectedCollectionCard.image}
+                  alt={selectedCollectionCard.title}
+                  className="collectionZoomImage"
+                  priority
+                />
+              </div>
+            </div>
+          ) : null}
         </section>
       </main>
     );
@@ -1377,6 +1577,10 @@ export function HomeScreen() {
 
                   if (item.title === "勉強時間") {
                     setActiveScreen("record");
+                  }
+
+                  if (item.title === "勉強カード") {
+                    setActiveScreen("collection");
                   }
 
                   if (item.title === "交流") {

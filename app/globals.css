@@ -1047,6 +1047,213 @@ button {
   text-align: center;
 }
 
+.collectionScreen {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 12px 16px;
+  background: linear-gradient(135deg, #e0f5ec 0%, #e8eef8 50%, #f8e8f0 100%);
+}
+
+.collectionHeader {
+  display: grid;
+  grid-template-columns: 64px 1fr 64px;
+  align-items: center;
+  min-height: 44px;
+}
+
+.collectionHeader h1 {
+  margin: 0;
+  color: #1d1d1f;
+  font-size: 17px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.collectionContent {
+  min-height: 0;
+  flex: 1;
+  overflow: hidden;
+  padding-bottom: 72px;
+}
+
+.collectionPanel {
+  display: grid;
+  grid-template-rows: auto auto auto auto minmax(0, 1fr);
+  height: 100%;
+  gap: 14px;
+  overflow: hidden;
+  border: 1px solid #e5e5ea;
+  border-radius: 28px;
+  padding: 16px;
+  background: #fff;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.07);
+}
+
+.collectionPanel h2 {
+  margin: 0;
+  color: #ff9f0a;
+  font-size: 20px;
+  font-weight: 800;
+  text-align: center;
+}
+
+.collectionSubHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.collectionSubHeader h3 {
+  margin: 0;
+  color: #1d1d1f;
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.collectionSubHeader span {
+  color: #8e8e93;
+  font-size: 18px;
+}
+
+.collectionTabs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.collectionTab {
+  display: grid;
+  gap: 6px;
+  place-items: center;
+  border: 1px solid #c7d2fe;
+  border-radius: 16px;
+  padding: 12px 6px;
+  background: #f2f7ff;
+  color: #1d1d1f;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.collectionTab span {
+  color: #5856d6;
+  font-size: 24px;
+  line-height: 1;
+}
+
+.collectionSummary {
+  display: grid;
+  grid-template-columns: 40px 1fr auto;
+  align-items: center;
+  gap: 12px;
+  border: 1px solid #e5e5ea;
+  border-radius: 24px;
+  padding: 10px 16px;
+  background: #fff;
+}
+
+.collectionSummaryIcon {
+  display: grid;
+  width: 40px;
+  height: 40px;
+  place-items: center;
+  border-radius: 999px;
+  background: #2563eb;
+  color: #fff;
+}
+
+.collectionSummary strong {
+  color: #1d1d1f;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.collectionSummary small {
+  color: #8e8e93;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.collectionGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.collectionCardSlot {
+  display: grid;
+  min-height: 149px;
+  place-items: center;
+  overflow: hidden;
+  border: 1px solid #d1d1d6;
+  border-radius: 8px;
+  background: #f2f2f7;
+  color: #c7c7cc;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 0;
+}
+
+.collectionCardSlotOwned {
+  background: #fff;
+  cursor: pointer;
+}
+
+.collectionCardImage {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.collectionZoomOverlay {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  overflow: hidden;
+  padding: clamp(44px, 6svh, 58px) 18px 76px;
+  background: rgba(0, 0, 0, 0.64);
+}
+
+.collectionZoomClose {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  display: grid;
+  width: 40px;
+  height: 40px;
+  place-items: center;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.92);
+  color: #1d1d1f;
+  font-size: 26px;
+  line-height: 1;
+}
+
+.collectionZoomCard {
+  overflow: hidden;
+  width: min(88vw, 286px);
+  max-width: 100%;
+  max-height: min(78svh, 620px);
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 18px 52px rgba(0, 0, 0, 0.36);
+}
+
+.collectionZoomImage {
+  display: block;
+  width: 100%;
+  height: 100%;
+  max-height: min(78svh, 620px);
+  object-fit: contain;
+}
+
 .examCountdown {
   display: grid;
   gap: 6px;
