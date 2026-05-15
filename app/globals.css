@@ -512,6 +512,112 @@ button {
   font-weight: 800;
 }
 
+.stopwatchScreen {
+  display: flex;
+  flex-direction: column;
+  background-position: center top;
+}
+
+.stopwatchContent {
+  display: grid;
+  flex: 1;
+  gap: 16px;
+  min-height: 0;
+  padding: 24px 20px 32px;
+}
+
+.stopwatchPanel {
+  display: grid;
+  gap: 14px;
+  align-content: center;
+  border-radius: 16px;
+  padding: 20px;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.stopwatchSubjectImageWrap {
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 14px;
+  background: #fff;
+}
+
+.stopwatchSubjectImage {
+  width: 100%;
+  height: min(40svh, 336px);
+  object-fit: contain;
+}
+
+.stopwatchSubjectName {
+  margin: 0;
+  color: #1d1d1f;
+  font-size: 14px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.stopwatchDisplay {
+  margin: 0;
+  color: #1d1d1f;
+  font-size: clamp(38px, 11vw, 44px);
+  font-weight: 700;
+  line-height: 1;
+  text-align: center;
+}
+
+.stopwatchActions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(18px, 6vw, 28px);
+}
+
+.stopwatchCircleButton {
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: #fff;
+}
+
+.stopwatchCircleButtonSub {
+  width: 70px;
+  height: 70px;
+  border: 1.5px solid #3c3c43;
+  color: #3c3c43;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.stopwatchCircleButtonMain {
+  width: 96px;
+  height: 96px;
+  border: 2.5px solid #007aff;
+  color: #007aff;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.stopwatchCircleButtonStop {
+  border-color: #34c759;
+  color: #34c759;
+}
+
+.stopwatchCircleButton:disabled {
+  cursor: wait;
+  opacity: 0.62;
+}
+
+.stopwatchMessage {
+  margin: 0;
+  border-radius: 12px;
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.8);
+  color: #3c3c43;
+  font-size: 12px;
+  text-align: center;
+}
+
 .examCountdown {
   display: grid;
   gap: 6px;

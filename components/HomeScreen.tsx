@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import backgroundImage from "@/source-images/background.png";
 import buttonImage from "@/source-images/button.png";
 import characterImage from "@/source-images/character01.png";
@@ -62,21 +62,94 @@ const menuItems = [
 ];
 
 const studySubjects = [
-  { title: "解剖学", image: kaibouImage },
-  { title: "生理学", image: seiriImage },
-  { title: "病理学概論", image: byouriImage },
-  { title: "臨床医学総論", image: souronImage },
-  { title: "臨床医学各論", image: kakuronImage },
-  { title: "リハビリテーション医学", image: rehaImage },
-  { title: "東洋医学概論", image: tougaiImage },
-  { title: "経絡経穴概論", image: keiketuImage },
-  { title: "東洋医学臨床論", image: tourinImage },
-  { title: "はり理論", image: hariImage },
-  { title: "きゅう理論", image: kyuImage },
-  { title: "医療概論", image: iryogaironImage },
-  { title: "衛生学・公衆衛生学", image: eiseiImage },
-  { title: "関係法規", image: kankeihoukiImage },
+  { id: "kaibou", title: "解剖学", subjectName: "解剖学", image: kaibouImage },
+  { id: "seiri", title: "生理学", subjectName: "生理学", image: seiriImage },
+  { id: "byouri", title: "病理学概論", subjectName: "病理学", image: byouriImage },
+  {
+    id: "souron",
+    title: "臨床医学総論",
+    subjectName: "臨床医学総論",
+    image: souronImage,
+  },
+  {
+    id: "kakuron",
+    title: "臨床医学各論",
+    subjectName: "臨床医学各論",
+    image: kakuronImage,
+  },
+  {
+    id: "reha",
+    title: "リハビリテーション医学",
+    subjectName: "リハビリテーション医学",
+    image: rehaImage,
+  },
+  {
+    id: "tougai",
+    title: "東洋医学概論",
+    subjectName: "東洋医学概論",
+    image: tougaiImage,
+  },
+  {
+    id: "keiketu",
+    title: "経絡経穴概論",
+    subjectName: "経絡経穴概論",
+    image: keiketuImage,
+  },
+  {
+    id: "tourin",
+    title: "東洋医学臨床論",
+    subjectName: "東洋医学臨床論",
+    image: tourinImage,
+  },
+  { id: "hari", title: "はり理論", subjectName: "はり理論", image: hariImage },
+  { id: "kyu", title: "きゅう理論", subjectName: "きゅう理論", image: kyuImage },
+  {
+    id: "iryogairon",
+    title: "医療概論",
+    subjectName: "医療概論",
+    image: iryogaironImage,
+  },
+  { id: "eisei", title: "衛生学・公衆衛生学", subjectName: "衛生学", image: eiseiImage },
+  {
+    id: "kankeihouki",
+    title: "関係法規",
+    subjectName: "関係法規",
+    image: kankeihoukiImage,
+  },
 ];
+
+type StudySubject = (typeof studySubjects)[number];
+
+type StudySummary = {
+  todayMinutes: number;
+  monthMinutes: number;
+  totalMinutes: number;
+};
+
+function formatStudyMinutes(minutes: number) {
+  const hours = Math.floor(minutes / 60);
+  const restMinutes = minutes % 60;
+
+  if (hours === 0) {
+    return `${restMinutes}分`;
+  }
+
+  if (restMinutes === 0) {
+    return `${hours}時間`;
+  }
+
+  return `${hours}時間${restMinutes}分`;
+}
+
+function formatStopwatchTime(totalSeconds: number) {
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+
+  return [hours, minutes, seconds]
+    .map((value) => value.toString().padStart(2, "0"))
+    .join(":");
+}
 
 function PasswordVisibilityIcon({ isVisible }: { isVisible: boolean }) {
   if (isVisible) {
@@ -164,7 +237,78 @@ export function HomeScreen() {
   const [isLoggedInPreview, setIsLoggedInPreview] = useState(false);
   const [needsProfileSetup, setNeedsProfileSetup] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const [activeScreen, setActiveScreen] = useState<"menu" | "timer">("menu");
+  const [activeScreen, setActiveScreen] = useState<"menu" | "timer" | "stopwatch">(
+    "menu",
+  );
+  const [selectedSubject, setSelectedSubject] = useState<StudySubject | null>(null);
+  const [studySummary, setStudySummary] = useState<StudySummary>({
+    todayMinutes: 0,
+    monthMinutes: 0,
+    totalMinutes: 0,
+  });
+  const [isStudySummaryLoading, setIsStudySummaryLoading] = useState(false);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const [isStopwatchRunning, setIsStopwatchRunning] = useState(false);
+  const [stopwatchMessage, setStopwatchMessage] = useState("");
+  const [isRegisteringStudySession, setIsRegisteringStudySession] = useState(false);
+
+  useEffect(() => {
+    if (!isLoggedInPreview || activeScreen !== "timer") {
+      return;
+    }
+
+    let isMounted = true;
+
+    async function loadStudySummary() {
+      setIsStudySummaryLoading(true);
+
+      const response = await fetch("/api/study-summary").catch(() => null);
+
+      if (!isMounted) {
+        return;
+      }
+
+      setIsStudySummaryLoading(false);
+
+      if (!response?.ok) {
+        return;
+      }
+
+      const result = (await response.json().catch(() => null)) as
+        | Partial<StudySummary>
+        | null;
+
+      if (!result) {
+        return;
+      }
+
+      setStudySummary({
+        todayMinutes: result.todayMinutes ?? 0,
+        monthMinutes: result.monthMinutes ?? 0,
+        totalMinutes: result.totalMinutes ?? 0,
+      });
+    }
+
+    void loadStudySummary();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [activeScreen, isLoggedInPreview]);
+
+  useEffect(() => {
+    if (!isStopwatchRunning) {
+      return;
+    }
+
+    const intervalId = window.setInterval(() => {
+      setElapsedSeconds((current) => current + 1);
+    }, 1000);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [isStopwatchRunning]);
 
   async function handleLogin(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -268,6 +412,9 @@ export function HomeScreen() {
 
     setIsLoggedInPreview(false);
     setActiveScreen("menu");
+    setSelectedSubject(null);
+    setElapsedSeconds(0);
+    setIsStopwatchRunning(false);
     setNeedsProfileSetup(false);
     setIsLoginOpen(false);
     setLoginId("");
@@ -275,9 +422,71 @@ export function HomeScreen() {
     setStudentName("");
     setNickname("");
     setDaysUntilExam(null);
+    setStudySummary({
+      todayMinutes: 0,
+      monthMinutes: 0,
+      totalMinutes: 0,
+    });
     setSelectedAvatarIconId("pixel01");
     setMessage("");
     setProfileMessage("");
+    setStopwatchMessage("");
+  }
+
+  function openStopwatch(subject: StudySubject) {
+    setSelectedSubject(subject);
+    setElapsedSeconds(0);
+    setIsStopwatchRunning(false);
+    setStopwatchMessage("");
+    setActiveScreen("stopwatch");
+  }
+
+  async function handleStudySessionRegister() {
+    if (!selectedSubject) {
+      return;
+    }
+
+    const durationMinutes = Math.ceil(elapsedSeconds / 60);
+
+    if (durationMinutes < 1) {
+      setStopwatchMessage("1分以上の学習時間を登録してください。");
+      return;
+    }
+
+    setIsRegisteringStudySession(true);
+    setIsStopwatchRunning(false);
+    setStopwatchMessage("");
+
+    const response = await fetch("/api/study-sessions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        subjectId: selectedSubject.id,
+        subjectName: selectedSubject.subjectName,
+        durationMinutes,
+      }),
+    }).catch(() => null);
+
+    setIsRegisteringStudySession(false);
+
+    if (!response?.ok) {
+      const result = (await response?.json().catch(() => null)) as {
+        message?: string;
+      } | null;
+      setStopwatchMessage(result?.message ?? "学習時間を登録できませんでした。");
+      return;
+    }
+
+    setStudySummary((current) => ({
+      todayMinutes: current.todayMinutes + durationMinutes,
+      monthMinutes: current.monthMinutes + durationMinutes,
+      totalMinutes: current.totalMinutes + durationMinutes,
+    }));
+    setElapsedSeconds(0);
+    setIsStopwatchRunning(false);
+    setStopwatchMessage("学習時間を登録しました。");
   }
 
   if (isLoggedInPreview && needsProfileSetup) {
@@ -386,17 +595,29 @@ export function HomeScreen() {
             <section className="timerSummary" aria-label="学習時間サマリー">
               <div>
                 <span>今日</span>
-                <strong>2時間35分</strong>
+                <strong>
+                  {isStudySummaryLoading
+                    ? "読込中"
+                    : formatStudyMinutes(studySummary.todayMinutes)}
+                </strong>
               </div>
               <i aria-hidden="true" />
               <div>
                 <span>今月</span>
-                <strong>42時間</strong>
+                <strong>
+                  {isStudySummaryLoading
+                    ? "読込中"
+                    : formatStudyMinutes(studySummary.monthMinutes)}
+                </strong>
               </div>
               <i aria-hidden="true" />
               <div>
                 <span>総学習時間</span>
-                <strong>186時間</strong>
+                <strong>
+                  {isStudySummaryLoading
+                    ? "読込中"
+                    : formatStudyMinutes(studySummary.totalMinutes)}
+                </strong>
               </div>
             </section>
 
@@ -407,7 +628,12 @@ export function HomeScreen() {
 
             <section className="subjectGrid" aria-label="科目一覧">
               {studySubjects.map((subject) => (
-                <button className="subjectCard" key={subject.title} type="button">
+                <button
+                  className="subjectCard"
+                  key={subject.title}
+                  type="button"
+                  onClick={() => openStopwatch(subject)}
+                >
                   <Image src={subject.image} alt="" className="subjectCover" />
                   <span>{subject.title}</span>
                 </button>
@@ -437,6 +663,102 @@ export function HomeScreen() {
               交流
             </button>
           </nav>
+        </section>
+      </main>
+    );
+  }
+
+  if (isLoggedInPreview && activeScreen === "stopwatch" && selectedSubject) {
+    return (
+      <main className="appShell">
+        <section
+          className="phoneFrame stopwatchScreen"
+          aria-label={`${selectedSubject.title} 学習タイマー画面`}
+          style={{ backgroundImage: `url(${backgroundImage.src})` }}
+        >
+          <header className="timerHeader">
+            <button
+              className="timerBackButton"
+              type="button"
+              onClick={() => {
+                setIsStopwatchRunning(false);
+                setActiveScreen("timer");
+              }}
+            >
+              <span aria-hidden="true">‹</span>
+              戻る
+            </button>
+            <h1>学習タイマー</h1>
+            <span className="timerHeaderBalance" aria-hidden="true" />
+          </header>
+
+          <div className="stopwatchContent">
+            <section className="timerSummary" aria-label="学習時間サマリー">
+              <div>
+                <span>今日</span>
+                <strong>{formatStudyMinutes(studySummary.todayMinutes)}</strong>
+              </div>
+              <i aria-hidden="true" />
+              <div>
+                <span>今月</span>
+                <strong>{formatStudyMinutes(studySummary.monthMinutes)}</strong>
+              </div>
+              <i aria-hidden="true" />
+              <div>
+                <span>総学習時間</span>
+                <strong>{formatStudyMinutes(studySummary.totalMinutes)}</strong>
+              </div>
+            </section>
+
+            <section className="stopwatchPanel" aria-label="ストップウォッチ">
+              <div className="stopwatchSubjectImageWrap">
+                <Image
+                  src={selectedSubject.image}
+                  alt={selectedSubject.title}
+                  className="stopwatchSubjectImage"
+                  priority
+                />
+              </div>
+
+              <p className="stopwatchSubjectName">{selectedSubject.title}</p>
+              <p className="stopwatchDisplay">{formatStopwatchTime(elapsedSeconds)}</p>
+
+              <div className="stopwatchActions">
+                <button
+                  className="stopwatchCircleButton stopwatchCircleButtonSub"
+                  type="button"
+                  onClick={() => {
+                    setElapsedSeconds(0);
+                    setIsStopwatchRunning(false);
+                    setStopwatchMessage("");
+                  }}
+                >
+                  リセット
+                </button>
+                <button
+                  className={`stopwatchCircleButton stopwatchCircleButtonMain ${
+                    isStopwatchRunning ? "stopwatchCircleButtonStop" : ""
+                  }`}
+                  type="button"
+                  onClick={() => setIsStopwatchRunning((current) => !current)}
+                >
+                  {isStopwatchRunning ? "停止" : "スタート"}
+                </button>
+                <button
+                  className="stopwatchCircleButton stopwatchCircleButtonSub"
+                  type="button"
+                  disabled={isRegisteringStudySession}
+                  onClick={handleStudySessionRegister}
+                >
+                  {isRegisteringStudySession ? "登録中" : "登録"}
+                </button>
+              </div>
+
+              {stopwatchMessage ? (
+                <p className="stopwatchMessage">{stopwatchMessage}</p>
+              ) : null}
+            </section>
+          </div>
         </section>
       </main>
     );
