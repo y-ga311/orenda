@@ -1213,27 +1213,11 @@ button {
   inset: 0;
   z-index: 10;
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: center;
   overflow: hidden;
-  padding: clamp(44px, 6svh, 58px) 18px 76px;
+  padding: 48px 18px 76px;
   background: rgba(0, 0, 0, 0.64);
-}
-
-.collectionZoomClose {
-  position: absolute;
-  top: 18px;
-  right: 18px;
-  display: grid;
-  width: 40px;
-  height: 40px;
-  place-items: center;
-  border: 0;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.92);
-  color: #1d1d1f;
-  font-size: 26px;
-  line-height: 1;
 }
 
 .collectionZoomCard {

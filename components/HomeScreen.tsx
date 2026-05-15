@@ -1498,14 +1498,6 @@ export function HomeScreen() {
               aria-label={`${selectedCollectionCard.title} のカード詳細`}
               onClick={() => setSelectedCollectionCard(null)}
             >
-              <button
-                className="collectionZoomClose"
-                type="button"
-                aria-label="カードを閉じる"
-                onClick={() => setSelectedCollectionCard(null)}
-              >
-                ×
-              </button>
               <div
                 className="collectionZoomCard"
                 role="presentation"
