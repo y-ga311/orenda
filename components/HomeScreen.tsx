@@ -1499,22 +1499,24 @@ export function HomeScreen() {
           className={`phoneFrame collectionScreen${isGachaPlaying ? " collectionScreen--gachaVideo" : ""}`}
           aria-label="ガチャ画面"
         >
-          <header className="collectionHeader">
-            <button
-              className="timerBackButton"
-              type="button"
-              onClick={() => {
-                gachaVideoRef.current?.pause();
-                setIsGachaPlaying(false);
-                setActiveScreen("collection");
-              }}
-            >
-              <span aria-hidden="true">‹</span>
-              戻る
-            </button>
-            <h1>ガチャ</h1>
-            <span className="timerHeaderBalance" aria-hidden="true" />
-          </header>
+          {!isGachaPlaying ? (
+            <header className="collectionHeader">
+              <button
+                className="timerBackButton"
+                type="button"
+                onClick={() => {
+                  gachaVideoRef.current?.pause();
+                  setIsGachaPlaying(false);
+                  setActiveScreen("collection");
+                }}
+              >
+                <span aria-hidden="true">‹</span>
+                戻る
+              </button>
+              <h1>ガチャ</h1>
+              <span className="timerHeaderBalance" aria-hidden="true" />
+            </header>
+          ) : null}
 
           <div className="gachaContent">
             {isGachaPlaying ? (
@@ -1539,6 +1541,25 @@ export function HomeScreen() {
               <section className="gachaPanel">
                 <h2>勉強カードが当たる!</h2>
                 <p>ランダムでカードが1枚手に入るよ</p>
+
+                <div className="collectionTabs" aria-label="カードメニュー">
+                  <button
+                    className="collectionTab"
+                    type="button"
+                    onClick={() => setActiveScreen("collection")}
+                  >
+                    <span aria-hidden="true">▣</span>
+                    コレクション
+                  </button>
+                  <button className="collectionTab collectionTabActive" type="button" aria-current="page">
+                    <span aria-hidden="true">✦</span>
+                    ガチャ
+                  </button>
+                  <button className="collectionTab" type="button">
+                    <span aria-hidden="true">♕</span>
+                    メダル
+                  </button>
+                </div>
 
                 <div className="gachaMachine" aria-live="polite">
                   {gachaResultCard ? (
@@ -1576,44 +1597,46 @@ export function HomeScreen() {
             )}
           </div>
 
-          <nav className="timerBottomNav" aria-label="下部ナビゲーション">
-            <button
-              className="timerNavItem"
-              type="button"
-              onClick={() => setActiveScreen("timer")}
-            >
-              <span aria-hidden="true">⏱</span>
-              タイマー
-            </button>
-            <button className="timerNavItem" type="button">
-              <span aria-hidden="true">📋</span>
-              問題
-            </button>
-            <button
-              className="timerNavItem"
-              type="button"
-              onClick={() => setActiveScreen("record")}
-            >
-              <span aria-hidden="true">⌛</span>
-              タイム
-            </button>
-            <button
-              className="timerNavItem timerNavItemActive"
-              type="button"
-              onClick={() => setActiveScreen("collection")}
-            >
-              <span aria-hidden="true">▣</span>
-              カード
-            </button>
-            <button
-              className="timerNavItem"
-              type="button"
-              onClick={() => setActiveScreen("ranking")}
-            >
-              <span aria-hidden="true">👥</span>
-              交流
-            </button>
-          </nav>
+          {!isGachaPlaying ? (
+            <nav className="timerBottomNav" aria-label="下部ナビゲーション">
+              <button
+                className="timerNavItem"
+                type="button"
+                onClick={() => setActiveScreen("timer")}
+              >
+                <span aria-hidden="true">⏱</span>
+                タイマー
+              </button>
+              <button className="timerNavItem" type="button">
+                <span aria-hidden="true">📋</span>
+                問題
+              </button>
+              <button
+                className="timerNavItem"
+                type="button"
+                onClick={() => setActiveScreen("record")}
+              >
+                <span aria-hidden="true">⌛</span>
+                タイム
+              </button>
+              <button
+                className="timerNavItem timerNavItemActive"
+                type="button"
+                onClick={() => setActiveScreen("collection")}
+              >
+                <span aria-hidden="true">▣</span>
+                カード
+              </button>
+              <button
+                className="timerNavItem"
+                type="button"
+                onClick={() => setActiveScreen("ranking")}
+              >
+                <span aria-hidden="true">👥</span>
+                交流
+              </button>
+            </nav>
+          ) : null}
         </section>
       </main>
     );
@@ -1652,7 +1675,7 @@ export function HomeScreen() {
               </div>
 
               <div className="collectionTabs" aria-label="カードメニュー">
-                <button className="collectionTab" type="button">
+                <button className="collectionTab collectionTabActive" type="button" aria-current="page">
                   <span aria-hidden="true">▣</span>
                   コレクション
                 </button>
