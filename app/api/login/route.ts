@@ -66,6 +66,7 @@ export async function POST(request: Request) {
     .maybeSingle();
 
   if (error) {
+    console.error("[login] students:", error.message);
     return NextResponse.json(
       { message: "ログイン処理中にエラーが発生しました。" },
       { status: 500 },
@@ -80,24 +81,25 @@ export async function POST(request: Request) {
   }
 
   const className = typeof data.class === "string" ? data.class : null;
-  const { data: examSchedule, error: examScheduleError } = className
-    ? await supabase
-        .from("national_exam_schedules")
-        .select("exam_date")
-        .eq("class_name", className)
-        .eq("is_active", true)
-        .maybeSingle()
-    : { data: null, error: null };
 
-  if (examScheduleError) {
-    return NextResponse.json(
-      { message: "国家試験日程の取得中にエラーが発生しました。" },
-      { status: 500 },
-    );
+  /** 複数アクティブ行があるとき maybeSingle が失敗してログイン全体が落ちるのを避け、日程はベストエフォートとする */
+  let examDate: string | null = null;
+  if (className) {
+    const { data: examRows, error: examScheduleError } = await supabase
+      .from("national_exam_schedules")
+      .select("exam_date")
+      .eq("class_name", className)
+      .eq("is_active", true)
+      .limit(1);
+
+    if (examScheduleError) {
+      console.error("[login] national_exam_schedules:", examScheduleError.message);
+      examDate = null;
+    } else {
+      const first = examRows?.[0];
+      examDate = typeof first?.exam_date === "string" ? first.exam_date : null;
+    }
   }
-
-  const examDate =
-    typeof examSchedule?.exam_date === "string" ? examSchedule.exam_date : null;
 
   const response = NextResponse.json({
     student: {

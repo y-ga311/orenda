@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import backgroundImage from "@/source-images/background.png";
 import buttonImage from "@/source-images/button.png";
 import characterImage from "@/source-images/character01.png";
@@ -359,12 +359,19 @@ export function HomeScreen() {
   const [needsProfileSetup, setNeedsProfileSetup] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [activeScreen, setActiveScreen] = useState<
-    "menu" | "timer" | "stopwatch" | "record" | "ranking" | "collection"
+    "menu" | "timer" | "stopwatch" | "record" | "ranking" | "collection" | "gacha"
   >("menu");
   const [selectedSubject, setSelectedSubject] = useState<StudySubject | null>(null);
   const [selectedCollectionCard, setSelectedCollectionCard] = useState<
     (typeof collectionCards)[number] | null
   >(null);
+  const [gachaResultCard, setGachaResultCard] = useState<
+    (typeof collectionCards)[number] | null
+  >(null);
+  const [isGachaPlaying, setIsGachaPlaying] = useState(false);
+  const [gachaVideoKey, setGachaVideoKey] = useState(0);
+  const gachaVideoEndedRef = useRef(false);
+  const gachaVideoRef = useRef<HTMLVideoElement | null>(null);
   const [studySummary, setStudySummary] = useState<StudySummary>({
     todayMinutes: 0,
     monthMinutes: 0,
@@ -636,6 +643,9 @@ export function HomeScreen() {
     setActiveScreen("menu");
     setSelectedSubject(null);
     setSelectedCollectionCard(null);
+    setGachaResultCard(null);
+    setIsGachaPlaying(false);
+    setGachaVideoKey(0);
     setElapsedSeconds(0);
     setIsStopwatchRunning(false);
     setNeedsProfileSetup(false);
@@ -668,6 +678,116 @@ export function HomeScreen() {
     setStopwatchMessage("");
     setActiveScreen("stopwatch");
   }
+
+  const finishGachaDraw = useCallback(() => {
+    if (gachaVideoEndedRef.current) {
+      return;
+    }
+
+    gachaVideoEndedRef.current = true;
+
+    const nextCard =
+      collectionCards[Math.floor(Math.random() * collectionCards.length)] ??
+      collectionCards[0];
+
+    setIsGachaPlaying(false);
+    setGachaResultCard(nextCard);
+  }, []);
+
+  const startGachaDraw = useCallback(() => {
+    gachaVideoEndedRef.current = false;
+    setGachaResultCard(null);
+    setIsGachaPlaying(true);
+    setGachaVideoKey((current) => current + 1);
+  }, []);
+
+  /** 動画ノードへの ref とメタデータ準備タイミング差を吸収して再生開始する */
+  useLayoutEffect(() => {
+    if (!isGachaPlaying || activeScreen !== "gacha") {
+      return;
+    }
+
+    const video = gachaVideoRef.current;
+    if (!video) {
+      return;
+    }
+
+    let cancelled = false;
+    let playbackAttempted = false;
+
+    let endFallbackTimer: ReturnType<typeof setTimeout> | undefined;
+    let fallbackScheduled = false;
+
+    const scheduleEndFallback = () => {
+      if (fallbackScheduled) {
+        return;
+      }
+      fallbackScheduled = true;
+
+      const finiteDuration =
+        typeof video.duration === "number" &&
+        Number.isFinite(video.duration) &&
+        video.duration > 0;
+      const ms = finiteDuration
+        ? Math.min(Math.ceil(video.duration * 1000) + 4_000, 180_000)
+        : 180_000;
+
+      endFallbackTimer = setTimeout(() => {
+        if (!cancelled && !gachaVideoEndedRef.current) {
+          finishGachaDraw();
+        }
+      }, ms);
+    };
+
+    const tryPlay = () => {
+      if (cancelled || playbackAttempted) {
+        return;
+      }
+
+      if (video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) {
+        return;
+      }
+
+      playbackAttempted = true;
+      video.removeEventListener("loadeddata", onMediaProgress);
+      video.removeEventListener("canplay", onMediaProgress);
+
+      video.currentTime = 0;
+      void video.play().catch(() => {
+        if (!cancelled) {
+          finishGachaDraw();
+        }
+      });
+    };
+
+    const onMediaProgress = () => {
+      tryPlay();
+    };
+
+    if (video.readyState >= HTMLMediaElement.HAVE_METADATA) {
+      scheduleEndFallback();
+    } else {
+      video.addEventListener("loadedmetadata", scheduleEndFallback, { once: true });
+    }
+
+    if (video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
+      tryPlay();
+    } else {
+      video.addEventListener("loadeddata", onMediaProgress, { passive: true });
+      video.addEventListener("canplay", onMediaProgress, { passive: true });
+    }
+
+    return () => {
+      cancelled = true;
+      video.removeEventListener("loadedmetadata", scheduleEndFallback);
+      video.removeEventListener("loadeddata", onMediaProgress);
+      video.removeEventListener("canplay", onMediaProgress);
+
+      if (endFallbackTimer) {
+        clearTimeout(endFallbackTimer);
+      }
+    };
+  }, [isGachaPlaying, activeScreen, gachaVideoKey, finishGachaDraw]);
 
   async function handleStudySessionRegister() {
     if (!selectedSubject) {
@@ -1372,6 +1492,133 @@ export function HomeScreen() {
     );
   }
 
+  if (isLoggedInPreview && activeScreen === "gacha") {
+    return (
+      <main className="appShell">
+        <section
+          className={`phoneFrame collectionScreen${isGachaPlaying ? " collectionScreen--gachaVideo" : ""}`}
+          aria-label="ガチャ画面"
+        >
+          <header className="collectionHeader">
+            <button
+              className="timerBackButton"
+              type="button"
+              onClick={() => {
+                gachaVideoRef.current?.pause();
+                setIsGachaPlaying(false);
+                setActiveScreen("collection");
+              }}
+            >
+              <span aria-hidden="true">‹</span>
+              戻る
+            </button>
+            <h1>ガチャ</h1>
+            <span className="timerHeaderBalance" aria-hidden="true" />
+          </header>
+
+          <div className="gachaContent">
+            {isGachaPlaying ? (
+              <div className="gachaVideoStage" aria-live="polite">
+                <video
+                  key={gachaVideoKey}
+                  ref={gachaVideoRef}
+                  className="gachaMovieCinematic"
+                  playsInline
+                  muted
+                  controls={false}
+                  preload="auto"
+                  disablePictureInPicture
+                  aria-label="ガチャ演出動画"
+                  onEnded={finishGachaDraw}
+                  onError={finishGachaDraw}
+                >
+                  <source src="/gacha_mov.mp4" type="video/mp4" />
+                </video>
+              </div>
+            ) : (
+              <section className="gachaPanel">
+                <h2>勉強カードが当たる!</h2>
+                <p>ランダムでカードが1枚手に入るよ</p>
+
+                <div className="gachaMachine" aria-live="polite">
+                  {gachaResultCard ? (
+                    <div className="gachaResult">
+                      <span>GET!</span>
+                      <Image
+                        src={gachaResultCard.image}
+                        alt={gachaResultCard.title}
+                        className="gachaResultCard"
+                        priority
+                      />
+                      <strong>{gachaResultCard.title}</strong>
+                    </div>
+                  ) : (
+                    <div className="gachaMachineIdle">
+                      <span aria-hidden="true">✦</span>
+                      <strong>ガチャ</strong>
+                    </div>
+                  )}
+                </div>
+
+                <div className="gachaPointRow">
+                  <span>ガチャポイント</span>
+                  <strong>500 pt</strong>
+                </div>
+
+                <button
+                  className="gachaButton"
+                  type="button"
+                  onClick={startGachaDraw}
+                >
+                  {gachaResultCard ? "もう一度回す（10 pt）" : "10ptでガチャを回す"}
+                </button>
+              </section>
+            )}
+          </div>
+
+          <nav className="timerBottomNav" aria-label="下部ナビゲーション">
+            <button
+              className="timerNavItem"
+              type="button"
+              onClick={() => setActiveScreen("timer")}
+            >
+              <span aria-hidden="true">⏱</span>
+              タイマー
+            </button>
+            <button className="timerNavItem" type="button">
+              <span aria-hidden="true">📋</span>
+              問題
+            </button>
+            <button
+              className="timerNavItem"
+              type="button"
+              onClick={() => setActiveScreen("record")}
+            >
+              <span aria-hidden="true">⌛</span>
+              タイム
+            </button>
+            <button
+              className="timerNavItem timerNavItemActive"
+              type="button"
+              onClick={() => setActiveScreen("collection")}
+            >
+              <span aria-hidden="true">▣</span>
+              カード
+            </button>
+            <button
+              className="timerNavItem"
+              type="button"
+              onClick={() => setActiveScreen("ranking")}
+            >
+              <span aria-hidden="true">👥</span>
+              交流
+            </button>
+          </nav>
+        </section>
+      </main>
+    );
+  }
+
   if (isLoggedInPreview && activeScreen === "collection") {
     const cardSlots = Array.from({ length: 99 }, (_, index) => {
       return collectionCards[index]
@@ -1409,7 +1656,15 @@ export function HomeScreen() {
                   <span aria-hidden="true">▣</span>
                   コレクション
                 </button>
-                <button className="collectionTab" type="button">
+                <button
+                  className="collectionTab"
+                  type="button"
+                  onClick={() => {
+                    setGachaResultCard(null);
+                    setIsGachaPlaying(false);
+                    setActiveScreen("gacha");
+                  }}
+                >
                   <span aria-hidden="true">✦</span>
                   ガチャ
                 </button>
