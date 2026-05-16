@@ -359,7 +359,14 @@ export function HomeScreen() {
   const [needsProfileSetup, setNeedsProfileSetup] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [activeScreen, setActiveScreen] = useState<
-    "menu" | "timer" | "stopwatch" | "record" | "ranking" | "collection" | "gacha"
+    | "menu"
+    | "timer"
+    | "stopwatch"
+    | "record"
+    | "ranking"
+    | "collection"
+    | "gacha"
+    | "mypage"
   >("menu");
   const [selectedSubject, setSelectedSubject] = useState<StudySubject | null>(null);
   const [selectedCollectionCard, setSelectedCollectionCard] = useState<
@@ -632,6 +639,12 @@ export function HomeScreen() {
     setNickname(result?.student?.nickname ?? nickname);
     setSelectedAvatarIconId(result?.student?.avatarIconId ?? selectedAvatarIconId);
     setNeedsProfileSetup(false);
+
+    if (activeScreen === "mypage") {
+      setProfileMessage("変更を保存しました。");
+    } else {
+      setProfileMessage("");
+    }
   }
 
   async function handleLogout() {
@@ -910,6 +923,95 @@ export function HomeScreen() {
                 type="submit"
               >
                 {isProfileSubmitting ? "登録中..." : "登録してはじめる"}
+              </button>
+            </form>
+          </div>
+        </section>
+      </main>
+    );
+  }
+
+  if (isLoggedInPreview && activeScreen === "mypage") {
+    return (
+      <main className="appShell">
+        <section
+          className="phoneFrame timerScreen"
+          aria-label="マイページ"
+          style={{ backgroundImage: `url(${backgroundImage.src})` }}
+        >
+          <header className="timerHeader">
+            <button
+              className="timerBackButton"
+              type="button"
+              onClick={() => {
+                setProfileMessage("");
+                setActiveScreen("menu");
+              }}
+            >
+              <span aria-hidden="true">‹</span>
+              戻る
+            </button>
+            <h1>マイページ</h1>
+            <span className="timerHeaderBalance" aria-hidden="true" />
+          </header>
+
+          <div className="timerContent myPageScroll">
+            <form className="myPageCard" onSubmit={handleProfileSubmit}>
+              <h2 className="myPageSectionTitle">プロフィールを編集</h2>
+
+              <label className="profileField">
+                ニックネーム{" "}
+                <span className="myPageHint">（1〜12文字）</span>
+                <input
+                  maxLength={12}
+                  autoComplete="nickname"
+                  onChange={(event) => setNickname(event.target.value)}
+                  placeholder="ニックネームを入力"
+                  required
+                  type="text"
+                  value={nickname}
+                />
+              </label>
+
+              <fieldset className="avatarFieldset">
+                <legend>アイコン</legend>
+                <div className="avatarGrid">
+                  {avatarIcons.map((icon) => (
+                    <label className="avatarOption" key={icon.id}>
+                      <input
+                        checked={selectedAvatarIconId === icon.id}
+                        name="avatarIcon"
+                        onChange={() => setSelectedAvatarIconId(icon.id)}
+                        type="radio"
+                        value={icon.id}
+                      />
+                      <span className="avatarImageWrap">
+                        <Image src={icon.image} alt={icon.label} />
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              </fieldset>
+
+              {profileMessage ? (
+                <p
+                  className={
+                    profileMessage === "変更を保存しました。"
+                      ? "formMessage formMessageSuccess"
+                      : "formMessage"
+                  }
+                  role="status"
+                >
+                  {profileMessage}
+                </p>
+              ) : null}
+
+              <button
+                className="profileSubmitButton"
+                disabled={isProfileSubmitting}
+                type="submit"
+              >
+                {isProfileSubmitting ? "保存中..." : "保存する"}
               </button>
             </form>
           </div>
@@ -1855,6 +1957,11 @@ export function HomeScreen() {
 
                   if (item.title === "交流") {
                     setActiveScreen("ranking");
+                  }
+
+                  if (item.title === "マイページ") {
+                    setProfileMessage("");
+                    setActiveScreen("mypage");
                   }
                 }}
               >
