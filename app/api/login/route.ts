@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
+import { normalizeGachaPoints } from "@/lib/normalizeGachaPoints";
 
 export const runtime = "nodejs";
 
@@ -60,7 +61,7 @@ export async function POST(request: Request) {
 
   const { data, error } = await supabase
     .from("students")
-    .select("gakusei_id, name, class, nickname, avatar_icon_id")
+    .select("gakusei_id, name, class, nickname, avatar_icon_id, gacha_points")
     .eq("gakusei_id", loginId)
     .eq("gakusei_password", password)
     .maybeSingle();
@@ -108,6 +109,7 @@ export async function POST(request: Request) {
       className,
       nickname: data.nickname,
       avatarIconId: data.avatar_icon_id,
+      gachaPoints: normalizeGachaPoints((data as { gacha_points?: unknown }).gacha_points),
       needsProfileSetup: !data.nickname || !data.avatar_icon_id,
       examDate,
       daysUntilExam: examDate ? getDaysUntilExam(examDate) : null,

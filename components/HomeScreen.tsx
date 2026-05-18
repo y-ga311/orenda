@@ -35,6 +35,8 @@ import tougaiCardImage from "@/source-images/tougai_card.png";
 import tourinImage from "@/source-images/tourin.png";
 import tourinCardImage from "@/source-images/tourin_card.png";
 import { avatarIcons, getAvatarIcon, type AvatarIconId } from "@/lib/avatarIcons";
+import { GACHA_SPIN_COST_PT } from "@/lib/gachaConstants";
+import { normalizeGachaPoints } from "@/lib/normalizeGachaPoints";
 
 const menuItems = [
   {
@@ -367,7 +369,11 @@ export function HomeScreen() {
     | "collection"
     | "gacha"
     | "mypage"
+    | "quest"
   >("menu");
+  const [stopwatchReturnScreen, setStopwatchReturnScreen] = useState<"timer" | "quest">(
+    "timer",
+  );
   const [selectedSubject, setSelectedSubject] = useState<StudySubject | null>(null);
   const [selectedCollectionCard, setSelectedCollectionCard] = useState<
     (typeof collectionCards)[number] | null
@@ -396,6 +402,9 @@ export function HomeScreen() {
   const [isStopwatchRunning, setIsStopwatchRunning] = useState(false);
   const [stopwatchMessage, setStopwatchMessage] = useState("");
   const [isRegisteringStudySession, setIsRegisteringStudySession] = useState(false);
+  const [gachaPoints, setGachaPoints] = useState(0);
+  const [isGachaChargeLoading, setIsGachaChargeLoading] = useState(false);
+  const [gachaChargeMessage, setGachaChargeMessage] = useState("");
 
   useEffect(() => {
     if (!isLoggedInPreview || activeScreen !== "timer") {
@@ -581,6 +590,7 @@ export function HomeScreen() {
       student?: {
         avatarIconId?: AvatarIconId | null;
         daysUntilExam?: number | null;
+        gachaPoints?: unknown;
         name?: string | null;
         needsProfileSetup?: boolean;
         nickname?: string | null;
@@ -591,6 +601,7 @@ export function HomeScreen() {
     setNickname(result?.student?.nickname ?? "");
     setDaysUntilExam(result?.student?.daysUntilExam ?? null);
     setSelectedAvatarIconId(result?.student?.avatarIconId ?? "pixel01");
+    setGachaPoints(normalizeGachaPoints(result?.student?.gachaPoints));
     setNeedsProfileSetup(Boolean(result?.student?.needsProfileSetup));
     setActiveScreen("menu");
     setIsLoginOpen(false);
@@ -625,6 +636,7 @@ export function HomeScreen() {
       message?: string;
       student?: {
         avatarIconId?: AvatarIconId | null;
+        gachaPoints?: unknown;
         name?: string | null;
         nickname?: string | null;
       };
@@ -638,6 +650,7 @@ export function HomeScreen() {
     setStudentName(result?.student?.name ?? studentName);
     setNickname(result?.student?.nickname ?? nickname);
     setSelectedAvatarIconId(result?.student?.avatarIconId ?? selectedAvatarIconId);
+    setGachaPoints(normalizeGachaPoints(result?.student?.gachaPoints ?? gachaPoints));
     setNeedsProfileSetup(false);
 
     if (activeScreen === "mypage") {
@@ -682,9 +695,13 @@ export function HomeScreen() {
     setMessage("");
     setProfileMessage("");
     setStopwatchMessage("");
+    setStopwatchReturnScreen("timer");
+    setGachaPoints(0);
+    setGachaChargeMessage("");
   }
 
-  function openStopwatch(subject: StudySubject) {
+  function openStopwatch(subject: StudySubject, returnTo: "timer" | "quest" = "timer") {
+    setStopwatchReturnScreen(returnTo);
     setSelectedSubject(subject);
     setElapsedSeconds(0);
     setIsStopwatchRunning(false);
@@ -707,12 +724,41 @@ export function HomeScreen() {
     setGachaResultCard(nextCard);
   }, []);
 
-  const startGachaDraw = useCallback(() => {
-    gachaVideoEndedRef.current = false;
-    setGachaResultCard(null);
-    setIsGachaPlaying(true);
-    setGachaVideoKey((current) => current + 1);
-  }, []);
+  const startGachaDraw = useCallback(async () => {
+    if (isGachaChargeLoading || isGachaPlaying) {
+      return;
+    }
+
+    setIsGachaChargeLoading(true);
+    setGachaChargeMessage("");
+
+    try {
+      const response = await fetch("/api/gacha-spin", {
+        method: "POST",
+      }).catch(() => null);
+
+      if (!response?.ok) {
+        const payload = response
+          ? ((await response.json().catch(() => null)) as { message?: string } | null)
+          : null;
+        setGachaChargeMessage(payload?.message ?? "ガチャを回せませんでした。");
+        return;
+      }
+
+      const payload = (await response.json().catch(() => null)) as {
+        gachaPoints?: unknown;
+      } | null;
+
+      setGachaPoints(normalizeGachaPoints(payload?.gachaPoints));
+
+      gachaVideoEndedRef.current = false;
+      setGachaResultCard(null);
+      setIsGachaPlaying(true);
+      setGachaVideoKey((current) => current + 1);
+    } finally {
+      setIsGachaChargeLoading(false);
+    }
+  }, [isGachaChargeLoading, isGachaPlaying]);
 
   /** 動画ノードへの ref とメタデータ準備タイミング差を吸収して再生開始する */
   useLayoutEffect(() => {
@@ -1020,6 +1066,132 @@ export function HomeScreen() {
     );
   }
 
+  if (isLoggedInPreview && activeScreen === "quest") {
+    const questShelfRows: StudySubject[][] = [];
+    for (let i = 0; i < studySubjects.length; i += 2) {
+      questShelfRows.push(studySubjects.slice(i, i + 2));
+    }
+
+    return (
+      <main className="appShell">
+        <section
+          className="phoneFrame timerScreen questScreen"
+          aria-label="クエスト"
+          style={{ backgroundImage: `url(${backgroundImage.src})` }}
+        >
+          <header className="timerHeader">
+            <button
+              className="timerBackButton"
+              type="button"
+              onClick={() => setActiveScreen("menu")}
+            >
+              <span aria-hidden="true">‹</span>
+              戻る
+            </button>
+            <h1>クエスト</h1>
+            <span className="timerHeaderBalance" aria-hidden="true" />
+          </header>
+
+          <div className="questMain">
+            <div className="questGachaBanner" role="status">
+              <span className="questGachaBannerLabel">現在の獲得ガチャポイント</span>
+              <strong className="questGachaBannerValue">
+                {gachaPoints.toLocaleString("ja-JP")} pt
+              </strong>
+            </div>
+
+            <p className="questScrollHint">
+              <span aria-hidden="true">⇅</span>
+              上下にスクロールして科目を選べます
+            </p>
+
+            <button
+              className="questDailyCard"
+              type="button"
+              onClick={() => {
+                const pick =
+                  studySubjects[Math.floor(Math.random() * studySubjects.length)];
+                if (pick) {
+                  openStopwatch(pick, "quest");
+                }
+              }}
+            >
+              <div className="questDailyCoverWrap">
+                <Image
+                  src={characterImage}
+                  alt=""
+                  className="questDailyCover"
+                  priority
+                />
+              </div>
+              <span className="questDailyTitle">デイリークエスト(ランダム10問)</span>
+            </button>
+
+            <div className="questShelf" aria-label="科目別クエスト">
+              {questShelfRows.map((row) => (
+                <div
+                  className="questBookRow"
+                  key={row.map((s) => s.id).join("-")}
+                >
+                  {row.map((subject) => (
+                    <button
+                      className="subjectCard questBookCard"
+                      key={subject.id}
+                      type="button"
+                      onClick={() => openStopwatch(subject, "quest")}
+                    >
+                      <Image src={subject.image} alt="" className="subjectCover" />
+                      <span>{subject.title}</span>
+                    </button>
+                  ))}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <nav className="timerBottomNav" aria-label="下部ナビゲーション">
+            <button
+              className="timerNavItem"
+              type="button"
+              onClick={() => setActiveScreen("timer")}
+            >
+              <span aria-hidden="true">⏱</span>
+              タイマー
+            </button>
+            <button className="timerNavItem timerNavItemActive" type="button">
+              <span aria-hidden="true">📋</span>
+              問題
+            </button>
+            <button
+              className="timerNavItem"
+              type="button"
+              onClick={() => setActiveScreen("record")}
+            >
+              <span aria-hidden="true">⌛</span>
+              タイム
+            </button>
+            <button
+              className="timerNavItem"
+              type="button"
+              onClick={() => setActiveScreen("collection")}
+            >
+              <span aria-hidden="true">▣</span>
+              カード
+            </button>
+            <button
+              className="timerNavItem"
+              type="button"
+              onClick={() => setActiveScreen("ranking")}
+            >
+              <span aria-hidden="true">👥</span>
+              交流
+            </button>
+          </nav>
+        </section>
+      </main>
+    );
+  }
+
   if (isLoggedInPreview && activeScreen === "timer") {
     return (
       <main className="appShell">
@@ -1096,7 +1268,11 @@ export function HomeScreen() {
               <span aria-hidden="true">⏱</span>
               タイマー
             </button>
-            <button className="timerNavItem" type="button">
+            <button
+              className="timerNavItem"
+              type="button"
+              onClick={() => setActiveScreen("quest")}
+            >
               <span aria-hidden="true">📋</span>
               問題
             </button>
@@ -1144,7 +1320,7 @@ export function HomeScreen() {
               type="button"
               onClick={() => {
                 setIsStopwatchRunning(false);
-                setActiveScreen("timer");
+                setActiveScreen(stopwatchReturnScreen);
               }}
             >
               <span aria-hidden="true">‹</span>
@@ -1685,16 +1861,35 @@ export function HomeScreen() {
 
                 <div className="gachaPointRow">
                   <span>ガチャポイント</span>
-                  <strong>500 pt</strong>
+                  <strong>{gachaPoints.toLocaleString("ja-JP")} pt</strong>
                 </div>
 
                 <button
                   className="gachaButton"
                   type="button"
-                  onClick={startGachaDraw}
+                  disabled={
+                    isGachaChargeLoading ||
+                    gachaPoints < GACHA_SPIN_COST_PT ||
+                    isGachaPlaying
+                  }
+                  onClick={() => void startGachaDraw()}
                 >
-                  {gachaResultCard ? "もう一度回す（10 pt）" : "10ptでガチャを回す"}
+                  {isGachaChargeLoading
+                    ? "処理中..."
+                    : gachaResultCard
+                      ? `もう一度回す（${GACHA_SPIN_COST_PT} pt）`
+                      : `${GACHA_SPIN_COST_PT}ptでガチャを回す`}
                 </button>
+                {gachaPoints < GACHA_SPIN_COST_PT && !isGachaPlaying ? (
+                  <p className="gachaPointShortage" role="status">
+                    ガチャを回すには {GACHA_SPIN_COST_PT} pt 必要です。
+                  </p>
+                ) : null}
+                {gachaChargeMessage ? (
+                  <p className="formMessage" role="alert">
+                    {gachaChargeMessage}
+                  </p>
+                ) : null}
               </section>
             )}
           </div>
@@ -1962,6 +2157,10 @@ export function HomeScreen() {
                   if (item.title === "マイページ") {
                     setProfileMessage("");
                     setActiveScreen("mypage");
+                  }
+
+                  if (item.title === "クエスト") {
+                    setActiveScreen("quest");
                   }
                 }}
               >

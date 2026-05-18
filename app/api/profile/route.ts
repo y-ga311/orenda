@@ -2,6 +2,7 @@ import { createClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { isAvatarIconId } from "@/lib/avatarIconIds";
+import { normalizeGachaPoints } from "@/lib/normalizeGachaPoints";
 
 export const runtime = "nodejs";
 
@@ -65,7 +66,7 @@ export async function POST(request: Request) {
       profile_completed_at: new Date().toISOString(),
     })
     .eq("gakusei_id", studentId)
-    .select("name, nickname, avatar_icon_id")
+    .select("name, nickname, avatar_icon_id, gacha_points")
     .single();
 
   if (error) {
@@ -80,6 +81,9 @@ export async function POST(request: Request) {
       name: data.name,
       nickname: data.nickname,
       avatarIconId: data.avatar_icon_id,
+      gachaPoints: normalizeGachaPoints(
+        (data as { gacha_points?: unknown }).gacha_points,
+      ),
     },
   });
 }
