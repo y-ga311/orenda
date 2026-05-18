@@ -1,6 +1,6 @@
 "use client";
 
-import Image from "next/image";
+import Image, { type StaticImageData } from "next/image";
 import { FormEvent, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import backgroundImage from "@/source-images/background.png";
 import buttonImage from "@/source-images/button.png";
@@ -149,6 +149,26 @@ const collectionCards = [
   { title: "医療概論", image: iryogaironCardImage },
   { title: "衛生学", image: eiseiCardImage },
   { title: "関係法規", image: kankeihoukiCardImage },
+];
+
+type AchievementMedalEntry = {
+  id: string;
+  title: string;
+  image: StaticImageData;
+  unlocked: boolean;
+};
+
+/** Pencil メダル画面（達成一覧）準拠のプレビューデータ */
+const achievementMedals: AchievementMedalEntry[] = [
+  { id: "career-nav", title: "キャリアnavi", image: kaibouImage, unlocked: true },
+  { id: "company-session", title: "企業説明会", image: seiriImage, unlocked: true },
+  { id: "school-fest", title: "学園祭", image: byouriImage, unlocked: false },
+  { id: "mock1", title: "第１回模試", image: souronImage, unlocked: true },
+  { id: "anki-sem1", title: "暗爺(１学期)", image: kakuronImage, unlocked: true },
+  { id: "anki-sem2", title: "暗爺(２学期)", image: rehaImage, unlocked: true },
+  { id: "anki-sem3", title: "暗爺(３学期)", image: tourinImage, unlocked: true },
+  { id: "anmame-sem1", title: "暗豆(1学期)", image: keiketuImage, unlocked: true },
+  { id: "anmame-sem2", title: "暗豆(２学期)", image: characterImage, unlocked: true },
 ];
 
 type StudySubject = (typeof studySubjects)[number];
@@ -367,6 +387,7 @@ export function HomeScreen() {
     | "record"
     | "ranking"
     | "collection"
+    | "medal"
     | "gacha"
     | "mypage"
     | "quest"
@@ -1833,7 +1854,11 @@ export function HomeScreen() {
                     <span aria-hidden="true">✦</span>
                     ガチャ
                   </button>
-                  <button className="collectionTab" type="button">
+                  <button
+                    className="collectionTab"
+                    type="button"
+                    onClick={() => setActiveScreen("medal")}
+                  >
                     <span aria-hidden="true">♕</span>
                     メダル
                   </button>
@@ -1939,6 +1964,146 @@ export function HomeScreen() {
     );
   }
 
+  if (isLoggedInPreview && activeScreen === "medal") {
+    const medalUnlockedCount = achievementMedals.filter((entry) => entry.unlocked).length;
+    const medalRemainingCount = achievementMedals.length - medalUnlockedCount;
+    const medalRows = Math.ceil(achievementMedals.length / 3);
+
+    return (
+      <main className="appShell">
+        <section className="phoneFrame collectionScreen" aria-label="メダル一覧">
+          <header className="collectionHeader">
+            <button
+              className="timerBackButton"
+              type="button"
+              onClick={() => setActiveScreen("collection")}
+            >
+              <span aria-hidden="true">‹</span>
+              戻る
+            </button>
+            <h1>メダル</h1>
+            <span className="timerHeaderBalance" aria-hidden="true" />
+          </header>
+
+          <div className="collectionContent">
+            <section className="collectionPanel medalPanel">
+              <div className="collectionTabs" aria-label="カードメニュー">
+                <button className="collectionTab" type="button" onClick={() => setActiveScreen("collection")}>
+                  <span aria-hidden="true">▣</span>
+                  コレクション
+                </button>
+                <button
+                  className="collectionTab"
+                  type="button"
+                  onClick={() => {
+                    setGachaResultCard(null);
+                    setIsGachaPlaying(false);
+                    setActiveScreen("gacha");
+                  }}
+                >
+                  <span aria-hidden="true">✦</span>
+                  ガチャ
+                </button>
+                <button
+                  className="collectionTab collectionTabActive"
+                  type="button"
+                  aria-current="page"
+                  onClick={() => setActiveScreen("medal")}
+                >
+                  <span aria-hidden="true">♕</span>
+                  メダル
+                </button>
+              </div>
+
+              <div className="medalStatsBar">
+                <div className="medalStatsBarLeft">
+                  <p className="medalStatsBarTitle">GETしたメダル</p>
+                  <p className="medalStatsBarSub">コンプリートして特典をもらおう</p>
+                </div>
+                <div className="medalStatsBarRight" aria-live="polite">
+                  <p className="medalStatsBarCount">現在 {medalUnlockedCount}種</p>
+                  <p className="medalStatsBarRemain">残り {medalRemainingCount}種</p>
+                </div>
+              </div>
+
+              <div className="medalBadgeScroll">
+                <div className="medalBadgeGrid" role="list" aria-label="達成メダル一覧">
+                  {Array.from({ length: medalRows }, (_, rowIndex) => (
+                    <div className="medalGridRow" key={rowIndex}>
+                      {achievementMedals.slice(rowIndex * 3, rowIndex * 3 + 3).map((medal) => (
+                        <div
+                          className={`medalCell${medal.unlocked ? "" : " medalCell--locked"}`}
+                          key={medal.id}
+                          role="listitem"
+                        >
+                          <div className="medalRingWrap" aria-hidden="true">
+                            <div className="medalRingInner">
+                              <div className="medalThumbClip">
+                                <Image
+                                  src={medal.image}
+                                  alt=""
+                                  className="medalBadgeThumb"
+                                  fill
+                                  sizes="(max-width: 430px) 28vw, 104px"
+                                />
+                              </div>
+                            </div>
+                          </div>
+                          <p
+                            className={
+                              medal.unlocked ? "medalBadgeLabel" : "medalBadgeLabel medalBadgeLabelLocked"
+                            }
+                          >
+                            {medal.title}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </section>
+          </div>
+
+          <nav className="timerBottomNav" aria-label="下部ナビゲーション">
+            <button
+              className="timerNavItem"
+              type="button"
+              onClick={() => setActiveScreen("timer")}
+            >
+              <span aria-hidden="true">⏱</span>
+              タイマー
+            </button>
+            <button className="timerNavItem" type="button">
+              <span aria-hidden="true">📋</span>
+              問題
+            </button>
+            <button
+              className="timerNavItem"
+              type="button"
+              onClick={() => setActiveScreen("record")}
+            >
+              <span aria-hidden="true">⌛</span>
+              タイム
+            </button>
+            <button className="timerNavItem timerNavItemActive" type="button">
+              <span aria-hidden="true">▣</span>
+              カード
+            </button>
+            <button
+              className="timerNavItem"
+              type="button"
+              onClick={() => setActiveScreen("ranking")}
+            >
+              <span aria-hidden="true">👥</span>
+              交流
+            </button>
+          </nav>
+        </section>
+      </main>
+    );
+  }
+
   if (isLoggedInPreview && activeScreen === "collection") {
     const cardSlots = Array.from({ length: 99 }, (_, index) => {
       return collectionCards[index]
@@ -1988,7 +2153,11 @@ export function HomeScreen() {
                   <span aria-hidden="true">✦</span>
                   ガチャ
                 </button>
-                <button className="collectionTab" type="button">
+                <button
+                  className="collectionTab"
+                  type="button"
+                  onClick={() => setActiveScreen("medal")}
+                >
                   <span aria-hidden="true">♕</span>
                   メダル
                 </button>
