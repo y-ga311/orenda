@@ -261,6 +261,39 @@ function formatStudyMinutes(minutes: number) {
   return `${hours}時間${restMinutes}分`;
 }
 
+function buildStudyPieGradient(
+  subjects: StudyRecordData["subjectBreakdown"],
+): string {
+  if (subjects.length === 0) {
+    return "#e5e5ea";
+  }
+
+  const totalMinutes = subjects.reduce((sum, subject) => sum + subject.minutes, 0);
+  if (totalMinutes <= 0) {
+    return "#e5e5ea";
+  }
+
+  let cumulativePercent = 0;
+  const stops = subjects.map((subject, index) => {
+    const start = cumulativePercent;
+    const slicePercent = (subject.minutes / totalMinutes) * 100;
+    cumulativePercent += slicePercent;
+    const end = index === subjects.length - 1 ? 100 : cumulativePercent;
+
+    return `${subject.color} ${start}% ${end}%`;
+  });
+
+  return `conic-gradient(from -90deg, ${stops.join(", ")})`;
+}
+
+function buildStudyPieChartLabel(
+  subjects: StudyRecordData["subjectBreakdown"],
+): string {
+  return subjects
+    .map((subject) => `${subject.subjectName} ${subject.percentage}%`)
+    .join("、");
+}
+
 function formatStopwatchTime(totalSeconds: number) {
   const hours = Math.floor(totalSeconds / 3600);
   const minutes = Math.floor((totalSeconds % 3600) / 60);
@@ -1457,6 +1490,8 @@ export function HomeScreen() {
       studiedDays: 0,
       totalMinutes: 0,
     };
+    const subjectBreakdown = studyRecord?.subjectBreakdown ?? [];
+    const studyPieGradient = buildStudyPieGradient(subjectBreakdown);
 
     return (
       <main className="appShell">
@@ -1514,35 +1549,34 @@ export function HomeScreen() {
               </div>
 
               <h3>時間配分</h3>
-              <div className="studyBreakdown">
-                {studyRecord?.subjectBreakdown.length ? (
-                  studyRecord.subjectBreakdown.map((subject) => (
-                    <div className="studyBreakdownRow" key={subject.subjectName}>
-                      <div className="studyBreakdownHead">
-                        <span>
-                          <i
-                            className="studyBreakdownDot"
-                            style={{ backgroundColor: subject.color }}
-                            aria-hidden="true"
-                          />
-                          {subject.subjectName}
-                        </span>
-                        <strong>{formatStudyMinutes(subject.minutes)}</strong>
-                      </div>
-                      <div
-                        className="studyBreakdownTrack"
-                        aria-label={`${subject.subjectName} ${subject.percentage}%`}
-                      >
-                        <span
-                          style={{
-                            width: `${subject.percentage}%`,
-                            backgroundColor: subject.color,
-                          }}
-                        />
-                      </div>
-                      <small>選択期間の{subject.percentage}%</small>
-                    </div>
-                  ))
+              <div className="studyBreakdown studyBreakdownPie">
+                {subjectBreakdown.length ? (
+                  <>
+                    <div
+                      className="studyPieChart"
+                      style={{ background: studyPieGradient }}
+                      role="img"
+                      aria-label={`科目別の時間配分: ${buildStudyPieChartLabel(subjectBreakdown)}`}
+                    />
+                    <ul className="studyPieLegend" aria-label="科目別の内訳">
+                      {subjectBreakdown.map((subject) => (
+                        <li className="studyPieLegendItem" key={subject.subjectName}>
+                          <span className="studyPieLegendLabel">
+                            <i
+                              className="studyBreakdownDot"
+                              style={{ backgroundColor: subject.color }}
+                              aria-hidden="true"
+                            />
+                            {subject.subjectName}
+                          </span>
+                          <strong className="studyPieLegendMinutes">
+                            {formatStudyMinutes(subject.minutes)}
+                          </strong>
+                          <small className="studyPieLegendPercent">{subject.percentage}%</small>
+                        </li>
+                      ))}
+                    </ul>
+                  </>
                 ) : (
                   <p className="recordEmptyText">
                     選択期間の学習時間を登録すると配分が表示されます。
