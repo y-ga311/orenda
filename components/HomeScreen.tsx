@@ -945,11 +945,7 @@ export function HomeScreen() {
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        subjectId: selectedSubject.id,
-        subjectName: selectedSubject.subjectName,
-        durationMinutes,
-      }),
+      body: JSON.stringify({ durationMinutes }),
     }).catch(() => null);
 
     setIsRegisteringStudySession(false);
@@ -958,18 +954,24 @@ export function HomeScreen() {
       const result = (await response?.json().catch(() => null)) as {
         message?: string;
       } | null;
-      setStopwatchMessage(result?.message ?? "学習時間を登録できませんでした。");
+      setStopwatchMessage(result?.message ?? "ガチャポイントを付与できませんでした。");
       return;
     }
 
-    setStudySummary((current) => ({
-      todayMinutes: current.todayMinutes + durationMinutes,
-      monthMinutes: current.monthMinutes + durationMinutes,
-      totalMinutes: current.totalMinutes + durationMinutes,
-    }));
+    const result = (await response.json().catch(() => null)) as {
+      gachaPoints?: unknown;
+      pointsEarned?: unknown;
+    } | null;
+    const pointsEarned = normalizeGachaPoints(result?.pointsEarned);
+
+    setGachaPoints(normalizeGachaPoints(result?.gachaPoints));
     setElapsedSeconds(0);
     setIsStopwatchRunning(false);
-    setStopwatchMessage("学習時間を登録しました。");
+    setStopwatchMessage(
+      pointsEarned > 0
+        ? `ガチャポイント +${pointsEarned.toLocaleString("ja-JP")} pt を獲得しました。`
+        : "ガチャポイントを付与しました。",
+    );
   }
 
   if (isLoggedInPreview && needsProfileSetup) {
@@ -1469,7 +1471,16 @@ export function HomeScreen() {
               </div>
 
               {stopwatchMessage ? (
-                <p className="stopwatchMessage">{stopwatchMessage}</p>
+                <p
+                  className={
+                    stopwatchMessage.includes("を獲得しました") ||
+                    stopwatchMessage.includes("を付与しました")
+                      ? "stopwatchMessage stopwatchMessageSuccess"
+                      : "stopwatchMessage"
+                  }
+                >
+                  {stopwatchMessage}
+                </p>
               ) : null}
             </section>
           </div>

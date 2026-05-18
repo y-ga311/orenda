@@ -756,6 +756,13 @@ button {
   text-align: center;
 }
 
+.stopwatchMessageSuccess {
+  background: #ffe0b8;
+  color: #ea580c;
+  font-size: 13px;
+  font-weight: 700;
+}
+
 .recordScreen {
   display: flex;
   flex-direction: column;

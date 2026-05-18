@@ -1,13 +1,13 @@
 import { createClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
+import { GACHA_POINTS_PER_STUDY_MINUTE } from "@/lib/gachaConstants";
+import { normalizeGachaPoints } from "@/lib/normalizeGachaPoints";
 
 export const runtime = "nodejs";
 
 type StudySessionRequestBody = {
   durationMinutes?: unknown;
-  subjectId?: unknown;
-  subjectName?: unknown;
 };
 
 export async function POST(request: Request) {
@@ -24,22 +24,12 @@ export async function POST(request: Request) {
   const body = (await request.json().catch(() => null)) as
     | StudySessionRequestBody
     | null;
-  const subjectId = typeof body?.subjectId === "string" ? body.subjectId : "";
-  const subjectName =
-    typeof body?.subjectName === "string" ? body.subjectName : "";
   const durationMinutes =
     typeof body?.durationMinutes === "number" ? body.durationMinutes : 0;
 
-  if (!subjectId || !subjectName || !Number.isInteger(durationMinutes)) {
+  if (!Number.isInteger(durationMinutes) || durationMinutes < 1) {
     return NextResponse.json(
-      { message: "学習記録の内容が正しくありません。" },
-      { status: 400 },
-    );
-  }
-
-  if (durationMinutes < 1) {
-    return NextResponse.json(
-      { message: "1分以上の学習時間を登録してください。" },
+      { message: "1分以上学習してから登録してください。" },
       { status: 400 },
     );
   }
@@ -61,20 +51,82 @@ export async function POST(request: Request) {
     },
   });
 
-  const { error } = await supabase.from("study_sessions").insert({
-    gakusei_id: studentId,
-    subject_id: subjectId,
-    subject_name: subjectName,
-    duration_minutes: durationMinutes,
-    studied_at: new Date().toISOString(),
+  const pointsEarned = durationMinutes * GACHA_POINTS_PER_STUDY_MINUTE;
+
+  const { data: rpcBalance, error: rpcError } = await supabase.rpc("award_gacha_points", {
+    p_gakusei_id: studentId,
+    p_amount: pointsEarned,
   });
 
-  if (error) {
+  if (!rpcError) {
+    const gachaPoints = normalizeGachaPoints(rpcBalance);
+
+    return NextResponse.json({
+      ok: true,
+      gachaPoints,
+      pointsEarned,
+    });
+  }
+
+  const haystack = `${rpcError.message ?? ""} ${"details" in rpcError ? String(rpcError.details ?? "") : ""} ${"hint" in rpcError ? String(rpcError.hint ?? "") : ""}`.toLowerCase();
+
+  const rpcUnavailable =
+    haystack.includes("could not find") ||
+    haystack.includes("schema cache") ||
+    haystack.includes("does not exist") ||
+    (haystack.includes("award_gacha_points") && haystack.includes("function"));
+
+  if (!rpcUnavailable) {
+    console.error("[study-sessions] award_gacha_points:", rpcError.message);
+
+    if (haystack.includes("student_not_found")) {
+      return NextResponse.json({ message: "ユーザー情報が見つかりません。" }, { status: 404 });
+    }
+
     return NextResponse.json(
-      { message: "学習時間の登録中にエラーが発生しました。" },
+      { message: "gacha_points の更新に失敗しました。" },
       { status: 500 },
     );
   }
 
-  return NextResponse.json({ ok: true });
+  const { data: currentRow, error: selectError } = await supabase
+    .from("students")
+    .select("gacha_points")
+    .eq("gakusei_id", studentId)
+    .maybeSingle();
+
+  if (selectError || !currentRow) {
+    return NextResponse.json(
+      { message: "ユーザー情報が見つかりません。" },
+      { status: 404 },
+    );
+  }
+
+  const nextGachaPoints =
+    normalizeGachaPoints(
+      (currentRow as { gacha_points?: unknown }).gacha_points,
+    ) + pointsEarned;
+
+  const { data: updatedRow, error: updateError } = await supabase
+    .from("students")
+    .update({ gacha_points: nextGachaPoints })
+    .eq("gakusei_id", studentId)
+    .select("gacha_points")
+    .maybeSingle();
+
+  if (updateError || !updatedRow) {
+    console.error("[study-sessions] update gacha_points:", updateError?.message);
+    return NextResponse.json(
+      { message: "gacha_points の更新に失敗しました。" },
+      { status: 500 },
+    );
+  }
+
+  return NextResponse.json({
+    ok: true,
+    gachaPoints: normalizeGachaPoints(
+      (updatedRow as { gacha_points?: unknown }).gacha_points,
+    ),
+    pointsEarned,
+  });
 }
