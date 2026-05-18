@@ -1167,7 +1167,7 @@ export function HomeScreen() {
                   priority
                 />
               </div>
-              <span className="questDailyTitle">デイリークエスト(ランダム10問)</span>
+              <span className="questDailyTitle">教員クエスト</span>
             </button>
 
             <div className="questShelf" aria-label="科目別クエスト">
@@ -1479,8 +1479,6 @@ export function HomeScreen() {
           </header>
 
           <div className="recordContent">
-            <h2 className="recordPageTitle">学習推移</h2>
-
             <section className="recordCard" aria-label="期間別の学習時間">
               <h3>{selectedPeriodOption.title}</h3>
               <div className="recordPeriodTabs" aria-label="表示する期間">
@@ -1553,8 +1551,8 @@ export function HomeScreen() {
               </div>
             </section>
 
-            <section className="recordCard calendarCard" aria-label="カレンダー">
-              <h3>カレンダー</h3>
+            <section className="recordCard calendarCard" aria-label="勉強した日">
+              <h3>勉強した日</h3>
               <div className="calendarMonth">
                 <button
                   type="button"
