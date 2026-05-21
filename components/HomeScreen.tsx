@@ -407,6 +407,12 @@ export function HomeScreen() {
   const [selectedAvatarIconId, setSelectedAvatarIconId] =
     useState<AvatarIconId>("pixel01");
   const [message, setMessage] = useState("");
+  const [loginSuccessNotice, setLoginSuccessNotice] = useState<{
+    dailyBonusAwarded: boolean;
+    dailyBonusPoints: number;
+    gachaPoints: number;
+    displayName: string;
+  } | null>(null);
   const [profileMessage, setProfileMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isProfileSubmitting, setIsProfileSubmitting] = useState(false);
@@ -666,6 +672,8 @@ export function HomeScreen() {
       student?: {
         avatarIconId?: AvatarIconId | null;
         daysUntilExam?: number | null;
+        dailyLoginBonusAwarded?: boolean;
+        dailyLoginBonusPoints?: unknown;
         gachaPoints?: unknown;
         name?: string | null;
         needsProfileSetup?: boolean;
@@ -673,16 +681,30 @@ export function HomeScreen() {
       };
     } | null;
 
+    const dailyLoginBonusPoints = normalizeGachaPoints(
+      result?.student?.dailyLoginBonusPoints,
+    );
+
     setStudentName(result?.student?.name ?? "");
     setNickname(result?.student?.nickname ?? "");
     setDaysUntilExam(result?.student?.daysUntilExam ?? null);
     setSelectedAvatarIconId(result?.student?.avatarIconId ?? "pixel01");
-    setGachaPoints(normalizeGachaPoints(result?.student?.gachaPoints));
+    const gachaPoints = normalizeGachaPoints(result?.student?.gachaPoints);
+    const dailyLoginBonusAwarded = Boolean(result?.student?.dailyLoginBonusAwarded);
+
+    setGachaPoints(gachaPoints);
     setNeedsProfileSetup(Boolean(result?.student?.needsProfileSetup));
     setActiveScreen("menu");
     setIsLoginOpen(false);
     setIsLoggedInPreview(true);
     setPassword("");
+    setMessage("");
+    setLoginSuccessNotice({
+      displayName: result?.student?.nickname || result?.student?.name || "",
+      gachaPoints,
+      dailyBonusAwarded: dailyLoginBonusAwarded,
+      dailyBonusPoints: dailyLoginBonusPoints,
+    });
   }
 
   async function handleProfileSubmit(event: FormEvent<HTMLFormElement>) {
@@ -752,6 +774,7 @@ export function HomeScreen() {
     setIsStopwatchRunning(false);
     setNeedsProfileSetup(false);
     setIsLoginOpen(false);
+    setLoginSuccessNotice(null);
     setLoginId("");
     setPassword("");
     setStudentName("");
@@ -974,6 +997,52 @@ export function HomeScreen() {
     );
   }
 
+  const loginSuccessNoticeModal = loginSuccessNotice ? (
+    <div
+      className="modalOverlay loginSuccessOverlay"
+      role="presentation"
+      onClick={() => setLoginSuccessNotice(null)}
+    >
+      <section
+        className="loginSuccessModal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="login-success-title"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <p className="loginSuccessBadge" aria-hidden="true">
+          ✓
+        </p>
+        <h2 id="login-success-title">ログインしました</h2>
+        {loginSuccessNotice.displayName ? (
+          <p className="loginSuccessLead">
+            {loginSuccessNotice.displayName}さん、おかえりなさい
+          </p>
+        ) : null}
+        {loginSuccessNotice.dailyBonusAwarded &&
+        loginSuccessNotice.dailyBonusPoints > 0 ? (
+          <p className="loginSuccessBonus">
+            本日初回ログインボーナス
+            <strong>
+              +{loginSuccessNotice.dailyBonusPoints.toLocaleString("ja-JP")} pt
+            </strong>
+          </p>
+        ) : null}
+        <div className="loginSuccessPointsCard" aria-label="ガチャポイント残高">
+          <span>現在のガチャポイント</span>
+          <strong>{loginSuccessNotice.gachaPoints.toLocaleString("ja-JP")} pt</strong>
+        </div>
+        <button
+          className="loginSuccessButton"
+          type="button"
+          onClick={() => setLoginSuccessNotice(null)}
+        >
+          OK
+        </button>
+      </section>
+    </div>
+  ) : null;
+
   if (isLoggedInPreview && needsProfileSetup) {
     return (
       <main className="appShell">
@@ -1051,6 +1120,7 @@ export function HomeScreen() {
             </form>
           </div>
         </section>
+        {loginSuccessNoticeModal}
       </main>
     );
   }
@@ -2412,6 +2482,7 @@ export function HomeScreen() {
             ))}
           </nav>
         </section>
+        {loginSuccessNoticeModal}
       </main>
     );
   }
@@ -2454,6 +2525,8 @@ export function HomeScreen() {
           <span>ログイン</span>
         </button>
       </section>
+
+      {loginSuccessNoticeModal}
 
       {isLoginOpen ? (
         <div className="modalOverlay" role="presentation">

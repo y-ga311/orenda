@@ -1,6 +1,8 @@
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
+import { getJapanDateParts } from "@/lib/japanDate";
 import { normalizeGachaPoints } from "@/lib/normalizeGachaPoints";
+import { processStudentLogin } from "@/lib/processStudentLogin";
 
 export const runtime = "nodejs";
 
@@ -8,18 +10,6 @@ type LoginRequestBody = {
   loginId?: unknown;
   password?: unknown;
 };
-
-function getJapanDateParts(date = new Date()) {
-  const formatter = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Tokyo",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  });
-  const [year, month, day] = formatter.format(date).split("-").map(Number);
-
-  return { year, month, day };
-}
 
 function getDaysUntilExam(examDate: string) {
   const { year, month, day } = getJapanDateParts();
@@ -61,13 +51,24 @@ export async function POST(request: Request) {
 
   const { data, error } = await supabase
     .from("students")
-    .select("gakusei_id, name, class, nickname, avatar_icon_id, gacha_points")
+    .select("gakusei_id, name, class, nickname, avatar_icon_id, gacha_points, students_login")
     .eq("gakusei_id", loginId)
     .eq("gakusei_password", password)
     .maybeSingle();
 
   if (error) {
     console.error("[login] students:", error.message);
+
+    if (error.message.includes("students_login")) {
+      return NextResponse.json(
+        {
+          message:
+            "students_login カラムがありません。Supabase で docs/sql/add-students-login-column.sql を実行してください。",
+        },
+        { status: 500 },
+      );
+    }
+
     return NextResponse.json(
       { message: "ログイン処理中にエラーが発生しました。" },
       { status: 500 },
@@ -78,6 +79,28 @@ export async function POST(request: Request) {
     return NextResponse.json(
       { message: "ログインIDまたはパスワードが違います。" },
       { status: 401 },
+    );
+  }
+
+  let loginProcess: Awaited<ReturnType<typeof processStudentLogin>>;
+
+  try {
+    const lastLogin =
+      typeof (data as { students_login?: unknown }).students_login === "string"
+        ? (data as { students_login: string }).students_login
+        : null;
+
+    loginProcess = await processStudentLogin(
+      supabase,
+      data.gakusei_id,
+      normalizeGachaPoints((data as { gacha_points?: unknown }).gacha_points),
+      lastLogin,
+    );
+  } catch (loginProcessError) {
+    console.error("[login] processStudentLogin:", loginProcessError);
+    return NextResponse.json(
+      { message: "ログイン後のポイント処理に失敗しました。" },
+      { status: 500 },
     );
   }
 
@@ -109,7 +132,9 @@ export async function POST(request: Request) {
       className,
       nickname: data.nickname,
       avatarIconId: data.avatar_icon_id,
-      gachaPoints: normalizeGachaPoints((data as { gacha_points?: unknown }).gacha_points),
+      gachaPoints: loginProcess.gachaPoints,
+      dailyLoginBonusAwarded: loginProcess.dailyBonusAwarded,
+      dailyLoginBonusPoints: loginProcess.dailyBonusPoints,
       needsProfileSetup: !data.nickname || !data.avatar_icon_id,
       examDate,
       daysUntilExam: examDate ? getDaysUntilExam(examDate) : null,

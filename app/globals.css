@@ -2022,6 +2022,100 @@ button {
   line-height: 1.5;
 }
 
+.loginSuccessOverlay {
+  z-index: 60;
+}
+
+.loginSuccessModal {
+  display: grid;
+  gap: 14px;
+  width: min(100%, 320px);
+  padding: 28px 22px 22px;
+  border: 1px solid #ffd6a8;
+  border-radius: 28px;
+  background: linear-gradient(180deg, #fffaf5 0%, #fff4e8 100%);
+  box-shadow: 0 20px 70px rgba(0, 0, 0, 0.36);
+  text-align: center;
+}
+
+.loginSuccessBadge {
+  margin: 0 auto;
+  display: grid;
+  width: 52px;
+  height: 52px;
+  place-items: center;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #34c759 0%, #248a3d 100%);
+  color: #fff;
+  font-size: 28px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.loginSuccessModal h2 {
+  margin: 0;
+  color: #063b72;
+  font-size: 22px;
+  font-weight: 800;
+}
+
+.loginSuccessLead {
+  margin: 0;
+  color: #52697b;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.loginSuccessBonus {
+  margin: 0;
+  display: grid;
+  gap: 4px;
+  border-radius: 16px;
+  padding: 12px 14px;
+  background: #ffe0b8;
+  color: #ea580c;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
+.loginSuccessBonus strong {
+  font-size: 22px;
+  font-weight: 800;
+}
+
+.loginSuccessPointsCard {
+  display: grid;
+  gap: 6px;
+  border: 1px solid #e5e5ea;
+  border-radius: 16px;
+  padding: 14px 16px;
+  background: #fff;
+}
+
+.loginSuccessPointsCard span {
+  color: #6e6e73;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.loginSuccessPointsCard strong {
+  color: #1d1d1f;
+  font-size: 26px;
+  font-weight: 800;
+}
+
+.loginSuccessButton {
+  min-height: 48px;
+  border: 0;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #38c8ff 0%, #006de6 100%);
+  color: #fff;
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+
 .submitButton {
   min-height: 48px;
   border: 0;
