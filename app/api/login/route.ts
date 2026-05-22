@@ -2,6 +2,7 @@ import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import { getJapanDateParts } from "@/lib/japanDate";
 import { normalizeGachaPoints } from "@/lib/normalizeGachaPoints";
+import { parseStudyTypeId } from "@/lib/studyTypeIds";
 import { processStudentLogin } from "@/lib/processStudentLogin";
 
 export const runtime = "nodejs";
@@ -51,7 +52,9 @@ export async function POST(request: Request) {
 
   const { data, error } = await supabase
     .from("students")
-    .select("gakusei_id, name, class, nickname, avatar_icon_id, gacha_points, students_login")
+    .select(
+      "gakusei_id, name, class, nickname, avatar_icon_id, gacha_points, students_login, study_type_id",
+    )
     .eq("gakusei_id", loginId)
     .eq("gakusei_password", password)
     .maybeSingle();
@@ -64,6 +67,16 @@ export async function POST(request: Request) {
         {
           message:
             "students_login カラムがありません。Supabase で docs/sql/add-students-login-column.sql を実行してください。",
+        },
+        { status: 500 },
+      );
+    }
+
+    if (error.message.includes("study_type_id")) {
+      return NextResponse.json(
+        {
+          message:
+            "study_type_id カラムがありません。Supabase で docs/sql/add-students-study-type-id.sql を実行してください。",
         },
         { status: 500 },
       );
@@ -132,6 +145,9 @@ export async function POST(request: Request) {
       className,
       nickname: data.nickname,
       avatarIconId: data.avatar_icon_id,
+      studyTypeId: parseStudyTypeId(
+        (data as { study_type_id?: unknown }).study_type_id,
+      ),
       gachaPoints: loginProcess.gachaPoints,
       dailyLoginBonusAwarded: loginProcess.dailyBonusAwarded,
       dailyLoginBonusPoints: loginProcess.dailyBonusPoints,

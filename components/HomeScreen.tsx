@@ -37,6 +37,8 @@ import tourinCardImage from "@/source-images/tourin_card.png";
 import { avatarIcons, getAvatarIcon, type AvatarIconId } from "@/lib/avatarIcons";
 import { GACHA_SPIN_COST_PT } from "@/lib/gachaConstants";
 import { normalizeGachaPoints } from "@/lib/normalizeGachaPoints";
+import { getStudyType, studyTypes } from "@/lib/studyTypes";
+import { parseStudyTypeId, type StudyTypeId } from "@/lib/studyTypeIds";
 
 const menuItems = [
   {
@@ -406,6 +408,12 @@ export function HomeScreen() {
   const [daysUntilExam, setDaysUntilExam] = useState<number | null>(null);
   const [selectedAvatarIconId, setSelectedAvatarIconId] =
     useState<AvatarIconId>("pixel01");
+  const [studyTypeId, setStudyTypeId] = useState<StudyTypeId | null>(null);
+  const [pendingStudyTypeId, setPendingStudyTypeId] = useState<StudyTypeId | null>(
+    null,
+  );
+  const [studyTypeMessage, setStudyTypeMessage] = useState("");
+  const [isStudyTypeSubmitting, setIsStudyTypeSubmitting] = useState(false);
   const [message, setMessage] = useState("");
   const [loginSuccessNotice, setLoginSuccessNotice] = useState<{
     dailyBonusAwarded: boolean;
@@ -414,6 +422,7 @@ export function HomeScreen() {
     displayName: string;
   } | null>(null);
   const [profileMessage, setProfileMessage] = useState("");
+  const [myPageTab, setMyPageTab] = useState<"edit" | "type">("edit");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isProfileSubmitting, setIsProfileSubmitting] = useState(false);
   const [isLoggedInPreview, setIsLoggedInPreview] = useState(false);
@@ -678,6 +687,7 @@ export function HomeScreen() {
         name?: string | null;
         needsProfileSetup?: boolean;
         nickname?: string | null;
+        studyTypeId?: unknown;
       };
     } | null;
 
@@ -689,6 +699,8 @@ export function HomeScreen() {
     setNickname(result?.student?.nickname ?? "");
     setDaysUntilExam(result?.student?.daysUntilExam ?? null);
     setSelectedAvatarIconId(result?.student?.avatarIconId ?? "pixel01");
+    setStudyTypeId(parseStudyTypeId(result?.student?.studyTypeId));
+    setPendingStudyTypeId(parseStudyTypeId(result?.student?.studyTypeId));
     const gachaPoints = normalizeGachaPoints(result?.student?.gachaPoints);
     const dailyLoginBonusAwarded = Boolean(result?.student?.dailyLoginBonusAwarded);
 
@@ -737,6 +749,7 @@ export function HomeScreen() {
         gachaPoints?: unknown;
         name?: string | null;
         nickname?: string | null;
+        studyTypeId?: unknown;
       };
     } | null;
 
@@ -748,6 +761,7 @@ export function HomeScreen() {
     setStudentName(result?.student?.name ?? studentName);
     setNickname(result?.student?.nickname ?? nickname);
     setSelectedAvatarIconId(result?.student?.avatarIconId ?? selectedAvatarIconId);
+    setStudyTypeId(parseStudyTypeId(result?.student?.studyTypeId ?? studyTypeId));
     setGachaPoints(normalizeGachaPoints(result?.student?.gachaPoints ?? gachaPoints));
     setNeedsProfileSetup(false);
 
@@ -756,6 +770,52 @@ export function HomeScreen() {
     } else {
       setProfileMessage("");
     }
+  }
+
+  async function handleStudyTypeSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setStudyTypeMessage("");
+
+    if (pendingStudyTypeId === null) {
+      setStudyTypeMessage("タイプを選択してください。");
+      return;
+    }
+
+    setIsStudyTypeSubmitting(true);
+
+    const response = await fetch("/api/study-type", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        studyTypeId: pendingStudyTypeId,
+      }),
+    }).catch(() => null);
+
+    setIsStudyTypeSubmitting(false);
+
+    if (!response) {
+      setStudyTypeMessage("通信エラーが発生しました。時間をおいて再度お試しください。");
+      return;
+    }
+
+    const result = (await response.json().catch(() => null)) as {
+      message?: string;
+      student?: {
+        studyTypeId?: unknown;
+      };
+    } | null;
+
+    if (!response.ok) {
+      setStudyTypeMessage(result?.message ?? "タイプを保存できませんでした。");
+      return;
+    }
+
+    const savedStudyTypeId = parseStudyTypeId(result?.student?.studyTypeId);
+    setStudyTypeId(savedStudyTypeId);
+    setPendingStudyTypeId(savedStudyTypeId);
+    setStudyTypeMessage("タイプを保存しました。");
   }
 
   async function handleLogout() {
@@ -773,6 +833,7 @@ export function HomeScreen() {
     setElapsedSeconds(0);
     setIsStopwatchRunning(false);
     setNeedsProfileSetup(false);
+    setMyPageTab("edit");
     setIsLoginOpen(false);
     setLoginSuccessNotice(null);
     setLoginId("");
@@ -791,6 +852,9 @@ export function HomeScreen() {
     setSelectedRankingPeriod("week");
     setRecordCalendarMonth(getCurrentJapanYearMonth());
     setSelectedAvatarIconId("pixel01");
+    setStudyTypeId(null);
+    setPendingStudyTypeId(null);
+    setStudyTypeMessage("");
     setMessage("");
     setProfileMessage("");
     setStopwatchMessage("");
@@ -1126,6 +1190,9 @@ export function HomeScreen() {
   }
 
   if (isLoggedInPreview && activeScreen === "mypage") {
+    const registeredStudyType =
+      studyTypeId === null ? null : getStudyType(studyTypeId);
+
     return (
       <main className="appShell">
         <section
@@ -1139,6 +1206,8 @@ export function HomeScreen() {
               type="button"
               onClick={() => {
                 setProfileMessage("");
+                setStudyTypeMessage("");
+                setMyPageTab("edit");
                 setActiveScreen("menu");
               }}
             >
@@ -1150,64 +1219,175 @@ export function HomeScreen() {
           </header>
 
           <div className="timerContent myPageScroll">
-            <form className="myPageCard" onSubmit={handleProfileSubmit}>
-              <h2 className="myPageSectionTitle">プロフィールを編集</h2>
-
-              <label className="profileField">
-                ニックネーム{" "}
-                <span className="myPageHint">（1〜12文字）</span>
-                <input
-                  maxLength={12}
-                  autoComplete="nickname"
-                  onChange={(event) => setNickname(event.target.value)}
-                  placeholder="ニックネームを入力"
-                  required
-                  type="text"
-                  value={nickname}
-                />
-              </label>
-
-              <fieldset className="avatarFieldset">
-                <legend>アイコン</legend>
-                <div className="avatarGrid">
-                  {avatarIcons.map((icon) => (
-                    <label className="avatarOption" key={icon.id}>
-                      <input
-                        checked={selectedAvatarIconId === icon.id}
-                        name="avatarIcon"
-                        onChange={() => setSelectedAvatarIconId(icon.id)}
-                        type="radio"
-                        value={icon.id}
-                      />
-                      <span className="avatarImageWrap">
-                        <Image src={icon.image} alt={icon.label} />
-                      </span>
-                    </label>
-                  ))}
-                </div>
-              </fieldset>
-
-              {profileMessage ? (
-                <p
-                  className={
-                    profileMessage === "変更を保存しました。"
-                      ? "formMessage formMessageSuccess"
-                      : "formMessage"
-                  }
-                  role="status"
-                >
-                  {profileMessage}
-                </p>
-              ) : null}
-
+            <div className="myPageTabs" role="tablist" aria-label="マイページメニュー">
               <button
-                className="profileSubmitButton"
-                disabled={isProfileSubmitting}
-                type="submit"
+                className={
+                  myPageTab === "edit"
+                    ? "myPageTab myPageTabActive"
+                    : "myPageTab"
+                }
+                type="button"
+                role="tab"
+                aria-selected={myPageTab === "edit"}
+                onClick={() => {
+                  setStudyTypeMessage("");
+                  setMyPageTab("edit");
+                }}
               >
-                {isProfileSubmitting ? "保存中..." : "保存する"}
+                編集
               </button>
-            </form>
+              <button
+                className={
+                  myPageTab === "type"
+                    ? "myPageTab myPageTabActive"
+                    : "myPageTab"
+                }
+                type="button"
+                role="tab"
+                aria-selected={myPageTab === "type"}
+                onClick={() => {
+                  setProfileMessage("");
+                  setStudyTypeMessage("");
+                  setPendingStudyTypeId(studyTypeId);
+                  setMyPageTab("type");
+                }}
+              >
+                タイプ
+              </button>
+            </div>
+
+            {myPageTab === "edit" ? (
+              <form className="myPageCard" onSubmit={handleProfileSubmit}>
+                <h2 className="myPageSectionTitle">プロフィールを編集</h2>
+
+                <label className="profileField">
+                  ニックネーム{" "}
+                  <span className="myPageHint">（1〜12文字）</span>
+                  <input
+                    maxLength={12}
+                    autoComplete="nickname"
+                    onChange={(event) => setNickname(event.target.value)}
+                    placeholder="ニックネームを入力"
+                    required
+                    type="text"
+                    value={nickname}
+                  />
+                </label>
+
+                <fieldset className="avatarFieldset">
+                  <legend>アイコン</legend>
+                  <div className="avatarGrid">
+                    {avatarIcons.map((icon) => (
+                      <label className="avatarOption" key={icon.id}>
+                        <input
+                          checked={selectedAvatarIconId === icon.id}
+                          name="avatarIcon"
+                          onChange={() => setSelectedAvatarIconId(icon.id)}
+                          type="radio"
+                          value={icon.id}
+                        />
+                        <span className="avatarImageWrap">
+                          <Image src={icon.image} alt={icon.label} />
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                </fieldset>
+
+                {profileMessage ? (
+                  <p
+                    className={
+                      profileMessage === "変更を保存しました。"
+                        ? "formMessage formMessageSuccess"
+                        : "formMessage"
+                    }
+                    role="status"
+                  >
+                    {profileMessage}
+                  </p>
+                ) : null}
+
+                <button
+                  className="profileSubmitButton"
+                  disabled={isProfileSubmitting}
+                  type="submit"
+                >
+                  {isProfileSubmitting ? "保存中..." : "保存する"}
+                </button>
+              </form>
+            ) : (
+              <form className="myPageCard myPageTypeCard" onSubmit={handleStudyTypeSubmit}>
+                <div className="myPageTypeHeader">
+                  <h2 className="myPageSectionTitle">得意な勉強タイプ</h2>
+                  <span
+                    className={
+                      studyTypeId === null
+                        ? "myPageTypeStatus myPageTypeStatusUnset"
+                        : "myPageTypeStatus myPageTypeStatusSet"
+                    }
+                  >
+                    {studyTypeId === null ? "未登録" : "登録済み"}
+                  </span>
+                </div>
+
+                {registeredStudyType ? (
+                  <div className="myPageTypeImageWrap">
+                    <Image
+                      src={registeredStudyType.image}
+                      alt={`勉強${registeredStudyType.label}`}
+                      className="myPageTypeImage"
+                      priority
+                    />
+                  </div>
+                ) : (
+                  <div className="myPageTypeEmpty" aria-label="勉強タイプ未登録">
+                    <p>タイプが未登録です</p>
+                    <span>下からタイプを選んで保存してください</span>
+                  </div>
+                )}
+
+                <fieldset className="studyTypeFieldset">
+                  <legend>タイプを選択</legend>
+                  <div className="studyTypeGrid">
+                    {studyTypes.map((type) => (
+                      <label className="studyTypeOption" key={type.id}>
+                        <input
+                          checked={pendingStudyTypeId === type.id}
+                          name="studyType"
+                          onChange={() => setPendingStudyTypeId(type.id)}
+                          type="radio"
+                          value={type.id}
+                        />
+                        <span className="studyTypeImageWrap">
+                          <Image src={type.image} alt={type.label} />
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                </fieldset>
+
+                {studyTypeMessage ? (
+                  <p
+                    className={
+                      studyTypeMessage === "タイプを保存しました。"
+                        ? "formMessage formMessageSuccess"
+                        : "formMessage"
+                    }
+                    role="status"
+                  >
+                    {studyTypeMessage}
+                  </p>
+                ) : null}
+
+                <button
+                  className="profileSubmitButton"
+                  disabled={pendingStudyTypeId === null || isStudyTypeSubmitting}
+                  type="submit"
+                >
+                  {isStudyTypeSubmitting ? "保存中..." : "保存する"}
+                </button>
+              </form>
+            )}
           </div>
         </section>
       </main>

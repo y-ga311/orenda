@@ -1,15 +1,12 @@
 import { createClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
-import { isAvatarIconId } from "@/lib/avatarIconIds";
-import { normalizeGachaPoints } from "@/lib/normalizeGachaPoints";
-import { parseStudyTypeId } from "@/lib/studyTypeIds";
+import { isStudyTypeId, parseStudyTypeId } from "@/lib/studyTypeIds";
 
 export const runtime = "nodejs";
 
-type ProfileRequestBody = {
-  nickname?: unknown;
-  avatarIconId?: unknown;
+type StudyTypeRequestBody = {
+  studyTypeId?: unknown;
 };
 
 export async function POST(request: Request) {
@@ -23,21 +20,17 @@ export async function POST(request: Request) {
     );
   }
 
-  const body = (await request.json().catch(() => null)) as ProfileRequestBody | null;
-  const nickname = typeof body?.nickname === "string" ? body.nickname.trim() : "";
-  const avatarIconId =
-    typeof body?.avatarIconId === "string" ? body.avatarIconId.trim() : "";
+  const body = (await request.json().catch(() => null)) as StudyTypeRequestBody | null;
+  const parsed =
+    typeof body?.studyTypeId === "number"
+      ? body.studyTypeId
+      : typeof body?.studyTypeId === "string"
+        ? Number(body.studyTypeId)
+        : Number.NaN;
 
-  if (nickname.length < 1 || nickname.length > 12) {
+  if (!isStudyTypeId(parsed)) {
     return NextResponse.json(
-      { message: "ニックネームは1文字以上12文字以内で入力してください。" },
-      { status: 400 },
-    );
-  }
-
-  if (!isAvatarIconId(avatarIconId)) {
-    return NextResponse.json(
-      { message: "アイコンを選択してください。" },
+      { message: "勉強タイプを選択してください。" },
       { status: 400 },
     );
   }
@@ -61,32 +54,32 @@ export async function POST(request: Request) {
 
   const { data, error } = await supabase
     .from("students")
-    .update({
-      nickname,
-      avatar_icon_id: avatarIconId,
-      profile_completed_at: new Date().toISOString(),
-    })
+    .update({ study_type_id: parsed })
     .eq("gakusei_id", studentId)
-    .select("name, nickname, avatar_icon_id, gacha_points, study_type_id")
+    .select("study_type_id")
     .single();
 
   if (error) {
+    if (error.message.includes("study_type_id")) {
+      return NextResponse.json(
+        {
+          message:
+            "study_type_id カラムがありません。Supabase で docs/sql/add-students-study-type-id.sql を実行してください。",
+        },
+        { status: 500 },
+      );
+    }
+
     return NextResponse.json(
-      { message: "プロフィール登録中にエラーが発生しました。" },
+      { message: "勉強タイプの保存中にエラーが発生しました。" },
       { status: 500 },
     );
   }
 
   return NextResponse.json({
     student: {
-      name: data.name,
-      nickname: data.nickname,
-      avatarIconId: data.avatar_icon_id,
       studyTypeId: parseStudyTypeId(
         (data as { study_type_id?: unknown }).study_type_id,
-      ),
-      gachaPoints: normalizeGachaPoints(
-        (data as { gacha_points?: unknown }).gacha_points,
       ),
     },
   });

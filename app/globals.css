@@ -301,6 +301,162 @@ button {
   font-weight: 500;
 }
 
+.myPageTabs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px;
+  border-radius: 12px;
+  padding: 4px;
+  background: #f2f2f7;
+}
+
+.myPageTab {
+  min-height: 38px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: #6e6e73;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.myPageTabActive {
+  background: #007aff;
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(0, 122, 255, 0.22);
+}
+
+.myPageTab:focus-visible {
+  outline: 3px solid rgba(0, 122, 255, 0.22);
+  outline-offset: 2px;
+}
+
+.myPageTypeCard {
+  text-align: center;
+}
+
+.myPageTypeHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  text-align: left;
+}
+
+.myPageTypeHeader .myPageSectionTitle {
+  text-align: left;
+}
+
+.myPageTypeStatus {
+  flex-shrink: 0;
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.myPageTypeStatusUnset {
+  background: rgba(255, 149, 0, 0.16);
+  color: #c2410c;
+}
+
+.myPageTypeStatusSet {
+  background: rgba(52, 211, 153, 0.18);
+  color: #065f46;
+}
+
+.myPageTypeEmpty {
+  display: grid;
+  gap: 6px;
+  border: 2px dashed #d1d1d6;
+  border-radius: 16px;
+  padding: 28px 16px;
+  background: #f9f9fb;
+}
+
+.myPageTypeEmpty p {
+  margin: 0;
+  color: #1d1d1f;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.myPageTypeEmpty span {
+  color: #8e8e93;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.myPageTypeImageWrap {
+  display: grid;
+  place-items: center;
+  margin-top: 4px;
+}
+
+.myPageTypeImage {
+  width: min(100%, 240px);
+  height: auto;
+  border-radius: 16px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+
+.studyTypeFieldset {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  border: 0;
+  padding: 0;
+  text-align: left;
+}
+
+.studyTypeFieldset legend {
+  margin-bottom: 4px;
+  padding: 0;
+  color: #6e6e73;
+  font-size: 14px;
+}
+
+.studyTypeGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.studyTypeOption {
+  position: relative;
+  display: block;
+}
+
+.studyTypeOption input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.studyTypeImageWrap {
+  display: grid;
+  overflow: hidden;
+  border: 1px solid #e5e5ea;
+  border-radius: 14px;
+  background: #fff;
+}
+
+.studyTypeImageWrap img {
+  width: 100%;
+  height: auto;
+  object-fit: contain;
+}
+
+.studyTypeOption input:checked + .studyTypeImageWrap {
+  border: 3px solid #007aff;
+  box-shadow: 0 0 0 2px rgba(0, 122, 255, 0.12);
+}
+
+.studyTypeOption input:focus-visible + .studyTypeImageWrap {
+  outline: 3px solid rgba(0, 122, 255, 0.22);
+  outline-offset: 3px;
+}
+
 .menuScreen {
   display: flex;
   flex-direction: column;
