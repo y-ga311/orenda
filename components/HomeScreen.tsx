@@ -5,6 +5,7 @@ import { FormEvent, useCallback, useEffect, useLayoutEffect, useRef, useState } 
 import backgroundImage from "@/source-images/background.png";
 import buttonImage from "@/source-images/button.png";
 import characterImage from "@/source-images/character01.png";
+import reviewQuestImage from "@/source-images/018.png";
 import logoImage from "@/source-images/logo01.png";
 import byouriImage from "@/source-images/byouri.png";
 import byouriCardImage from "@/source-images/byouri_card.png";
@@ -257,14 +258,29 @@ const rankingPeriodOptions = [
 
 type RankingPeriod = (typeof rankingPeriodOptions)[number]["id"];
 
+type StudyRankingRewardInfo = {
+  badgeLabel: string;
+  description: string;
+  encouragement: string;
+  headline: string;
+  periodType: "week" | "month";
+  points: number;
+  recentGrants: Array<{
+    grantedAt: string;
+    periodKey: string;
+    periodType: string;
+    pointsAwarded: number;
+  }>;
+};
+
 type StudyRankingData = {
   currentUser: StudyRankingItem | null;
   period: RankingPeriod;
   ranking: StudyRankingItem[];
   range: {
-    endDate: string;
-    startDate: string;
-  };
+    label: string;
+  } | null;
+  rewardInfo: StudyRankingRewardInfo | null;
 };
 
 function formatStudyMinutes(minutes: number) {
@@ -445,6 +461,7 @@ export function HomeScreen() {
     useState<QuestQuestionCount>(10);
   const [questQuestionIndex, setQuestQuestionIndex] = useState(0);
   const [isDailyQuest, setIsDailyQuest] = useState(false);
+  const [isReviewQuest, setIsReviewQuest] = useState(false);
   const [selectedQuestChoice, setSelectedQuestChoice] = useState<number | null>(null);
   const [questAnswerSubmitted, setQuestAnswerSubmitted] = useState(false);
   const [questCorrectCount, setQuestCorrectCount] = useState(0);
@@ -465,6 +482,9 @@ export function HomeScreen() {
   >({});
   const [isQuestSubjectCountsLoading, setIsQuestSubjectCountsLoading] =
     useState(false);
+  const [questReviewQuestionCount, setQuestReviewQuestionCount] = useState(0);
+  const [isQuestReviewCountLoading, setIsQuestReviewCountLoading] = useState(false);
+  const [isQuestReviewStarting, setIsQuestReviewStarting] = useState(false);
   const [message, setMessage] = useState("");
   const [loginSuccessNotice, setLoginSuccessNotice] = useState<{
     dailyBonusAwarded: boolean;
@@ -599,36 +619,47 @@ export function HomeScreen() {
 
     let isMounted = true;
 
-    async function loadQuestSubjectQuestionCounts() {
+    async function loadQuestSelectData() {
       setIsQuestSubjectCountsLoading(true);
+      setIsQuestReviewCountLoading(true);
 
       const subjectIds = studySubjects.map((subject) => subject.id).join(",");
-      const response = await fetch(
-        `/api/quest-subject-counts?subjectIds=${encodeURIComponent(subjectIds)}`,
-      ).catch(() => null);
+      const [subjectCountsResponse, reviewCountResponse] = await Promise.all([
+        fetch(
+          `/api/quest-subject-counts?subjectIds=${encodeURIComponent(subjectIds)}`,
+        ).catch(() => null),
+        fetch("/api/quest-review").catch(() => null),
+      ]);
 
       if (!isMounted) {
         return;
       }
 
       setIsQuestSubjectCountsLoading(false);
+      setIsQuestReviewCountLoading(false);
 
-      if (!response?.ok) {
-        return;
+      if (subjectCountsResponse?.ok) {
+        const result = (await subjectCountsResponse.json().catch(() => null)) as {
+          counts?: Record<string, number>;
+        } | null;
+
+        if (result?.counts) {
+          setQuestSubjectQuestionCounts(result.counts);
+        }
       }
 
-      const result = (await response.json().catch(() => null)) as {
-        counts?: Record<string, number>;
-      } | null;
+      if (reviewCountResponse?.ok) {
+        const result = (await reviewCountResponse.json().catch(() => null)) as {
+          count?: number;
+        } | null;
 
-      if (!result?.counts) {
-        return;
+        setQuestReviewQuestionCount(
+          typeof result?.count === "number" ? result.count : 0,
+        );
       }
-
-      setQuestSubjectQuestionCounts(result.counts);
     }
 
-    void loadQuestSubjectQuestionCounts();
+    void loadQuestSelectData();
 
     return () => {
       isMounted = false;
@@ -974,6 +1005,10 @@ export function HomeScreen() {
     setQuestSetupMessage("");
     setQuestSubjectQuestionCounts({});
     setIsQuestSubjectCountsLoading(false);
+    setQuestReviewQuestionCount(0);
+    setIsQuestReviewCountLoading(false);
+    setIsReviewQuest(false);
+    setIsQuestReviewStarting(false);
   }
 
   function resetQuestScreen() {
@@ -983,6 +1018,7 @@ export function HomeScreen() {
     setSelectedQuestQuestionCount(10);
     setQuestQuestionIndex(0);
     setIsDailyQuest(false);
+    setIsReviewQuest(false);
     setSelectedQuestChoice(null);
     setQuestAnswerSubmitted(false);
     setQuestCorrectCount(0);
@@ -994,11 +1030,13 @@ export function HomeScreen() {
     setIsQuestSetupLoading(false);
     setIsQuestStarting(false);
     setQuestSetupMessage("");
+    setIsQuestReviewStarting(false);
   }
 
   async function openQuestSetup(subject: StudySubject) {
     setSelectedQuestSubject(subject);
     setIsDailyQuest(false);
+    setIsReviewQuest(false);
     setSelectedQuestSubcategoryIds([]);
     setSelectedQuestQuestionCount(10);
     setQuestQuestionIndex(0);
@@ -1110,6 +1148,7 @@ export function HomeScreen() {
 
     setSelectedQuestSubject(pick);
     setIsDailyQuest(true);
+    setIsReviewQuest(false);
     setSelectedQuestSubcategoryIds([]);
     setSelectedQuestQuestionCount(10);
     setQuestQuestionIndex(0);
@@ -1121,6 +1160,54 @@ export function HomeScreen() {
     setQuestSetupSubcategories([]);
     setQuestSessionQuestions([]);
     setQuestAnswerLog([]);
+    setIsQuestSetupLoading(false);
+    setIsQuestStarting(false);
+    setQuestSetupMessage("");
+    setQuestView("question");
+  }
+
+  async function openReviewQuest() {
+    if (isQuestReviewStarting || questReviewQuestionCount === 0) {
+      return;
+    }
+
+    setIsQuestReviewStarting(true);
+
+    const response = await fetch("/api/quest-review", {
+      method: "POST",
+    }).catch(() => null);
+
+    setIsQuestReviewStarting(false);
+
+    if (!response?.ok) {
+      return;
+    }
+
+    const result = (await response.json().catch(() => null)) as {
+      questions?: QuestSessionQuestion[];
+      questionCount?: number;
+    } | null;
+    const questions = result?.questions ?? [];
+
+    if (questions.length === 0) {
+      setQuestReviewQuestionCount(0);
+      return;
+    }
+
+    setSelectedQuestSubject(null);
+    setIsDailyQuest(false);
+    setIsReviewQuest(true);
+    setSelectedQuestSubcategoryIds([]);
+    setQuestSessionQuestions(questions);
+    setSelectedQuestQuestionCount(result?.questionCount ?? questions.length);
+    setQuestQuestionIndex(0);
+    setSelectedQuestChoice(null);
+    setQuestAnswerSubmitted(false);
+    setQuestCorrectCount(0);
+    setQuestAnswerLog([]);
+    setIsQuestCompleting(false);
+    setQuestCompleteMessage("");
+    setQuestSetupSubcategories([]);
     setIsQuestSetupLoading(false);
     setIsQuestStarting(false);
     setQuestSetupMessage("");
@@ -1143,16 +1230,18 @@ export function HomeScreen() {
       body: JSON.stringify({
         correctCount: questCorrectCount,
         questionCount: selectedQuestQuestionCount,
-        questScope: isDailyQuest ? "teacher" : "subject",
-        ...(isDailyQuest ||
-        !selectedQuestSubject ||
-        selectedQuestSubcategoryIds.length === 0
+        questScope: isDailyQuest ? "teacher" : isReviewQuest ? "review" : "subject",
+        ...(isDailyQuest
           ? {}
-          : {
-              subjectId: selectedQuestSubject.id,
-              subcategoryIds: selectedQuestSubcategoryIds,
-              answers: questAnswerLog,
-            }),
+          : isReviewQuest
+            ? { answers: questAnswerLog }
+            : !selectedQuestSubject || selectedQuestSubcategoryIds.length === 0
+              ? {}
+              : {
+                  subjectId: selectedQuestSubject.id,
+                  subcategoryIds: selectedQuestSubcategoryIds,
+                  answers: questAnswerLog,
+                }),
       }),
     }).catch(() => null);
 
@@ -1797,11 +1886,17 @@ export function HomeScreen() {
       </nav>
     );
 
-    if (questView === "question" && selectedQuestSubject) {
+    if (
+      questView === "question" &&
+      (selectedQuestSubject || isDailyQuest || isReviewQuest)
+    ) {
       const questionNumber = questQuestionIndex + 1;
       const dailyQuest = isDailyQuest ? getDailyQuestQuestion(questionNumber) : null;
       const sessionQuest = questSessionQuestions[questQuestionIndex] ?? null;
       const currentQuest = isDailyQuest ? dailyQuest : sessionQuest;
+      const questChoiceKeyPrefix = isReviewQuest
+        ? "review"
+        : selectedQuestSubject?.id ?? "quest";
 
       if (!currentQuest) {
         return (
@@ -1816,7 +1911,9 @@ export function HomeScreen() {
                   className="timerBackButton"
                   type="button"
                   onClick={() => {
-                    setQuestView(isDailyQuest ? "select" : "setup");
+                    setQuestView(
+                      isDailyQuest || isReviewQuest ? "select" : "setup",
+                    );
                   }}
                 >
                   <span aria-hidden="true">‹</span>
@@ -1856,7 +1953,9 @@ export function HomeScreen() {
                 onClick={() => {
                   setSelectedQuestChoice(null);
                   setQuestAnswerSubmitted(false);
-                  setQuestView(isDailyQuest ? "select" : "setup");
+                    setQuestView(
+                      isDailyQuest || isReviewQuest ? "select" : "setup",
+                    );
                 }}
               >
                 <span aria-hidden="true">‹</span>
@@ -1886,7 +1985,7 @@ export function HomeScreen() {
                 {currentQuest.choices.map((choice, index) => (
                   <button
                     className={getQuestChoiceClassName(index, currentQuest.correctIndex)}
-                    key={`${selectedQuestSubject.id}-${questQuestionIndex}-${index}`}
+                    key={`${questChoiceKeyPrefix}-${questQuestionIndex}-${index}`}
                     type="button"
                     role="option"
                     aria-selected={selectedQuestChoice === index}
@@ -2264,36 +2363,93 @@ export function HomeScreen() {
               上下にスクロールして科目を選べます
             </p>
 
-            <button
-              className="questDailyCard"
-              type="button"
-              onClick={openDailyQuestQuestion}
-            >
-              <div className="questDailyCoverWrap">
-                <Image
-                  src={characterImage}
-                  alt=""
-                  className="questDailyCover"
-                  priority
-                />
-              </div>
-              <span className="questDailyTitle">教員クエスト(ランダム10問)</span>
-            </button>
-
             <div
-              aria-busy={isQuestSubjectCountsLoading}
+              aria-busy={isQuestSubjectCountsLoading || isQuestReviewCountLoading}
               className={
-                isQuestSubjectCountsLoading
+                isQuestSubjectCountsLoading || isQuestReviewCountLoading
                   ? "questShelf questShelfLoading"
                   : "questShelf"
               }
-              aria-label="科目別クエスト"
+              aria-label="クエスト一覧"
             >
-              {isQuestSubjectCountsLoading ? (
+              {isQuestSubjectCountsLoading || isQuestReviewCountLoading ? (
                 <p className="questSetupNote questShelfLoadingNote">
-                  科目の問題数を読み込んでいます...
+                  クエスト情報を読み込んでいます...
                 </p>
               ) : null}
+
+              <div className="questBookRow">
+                <button
+                  className="subjectCard questBookCard questSpecialCard"
+                  type="button"
+                  onClick={openDailyQuestQuestion}
+                >
+                  <div className="questBookCoverWrap questTeacherCoverWrap">
+                    <Image
+                      src={characterImage}
+                      alt=""
+                      className="questTeacherCover"
+                      priority
+                    />
+                  </div>
+                  <div className="questBookCardMeta">
+                    <span>教員クエスト</span>
+                  </div>
+                </button>
+
+                {(() => {
+                  const isReviewUnavailable =
+                    !isQuestReviewCountLoading && questReviewQuestionCount === 0;
+
+                  return (
+                    <button
+                      className={
+                        isReviewUnavailable
+                          ? "subjectCard questBookCard questBookCardUnavailable questSpecialCard"
+                          : "subjectCard questBookCard questSpecialCard"
+                      }
+                      disabled={
+                        isReviewUnavailable ||
+                        isQuestReviewStarting ||
+                        isQuestReviewCountLoading
+                      }
+                      type="button"
+                      aria-label={
+                        isReviewUnavailable
+                          ? "復習クエスト（復習する問題なし）"
+                          : `復習クエスト（${questReviewQuestionCount}問）`
+                      }
+                      onClick={() => {
+                        void openReviewQuest();
+                      }}
+                    >
+                      <div className="questBookCoverWrap questReviewCoverWrap">
+                        <Image
+                          src={reviewQuestImage}
+                          alt=""
+                          className={
+                            isReviewUnavailable
+                              ? "questReviewCover questBookCoverUnavailable"
+                              : "questReviewCover"
+                          }
+                        />
+                        {!isReviewUnavailable ? (
+                          <span className="questUnavailableBadge">
+                            {questReviewQuestionCount}問
+                          </span>
+                        ) : null}
+                      </div>
+                      <div className="questBookCardMeta">
+                        <span>復習クエスト</span>
+                        {isReviewUnavailable ? (
+                          <span className="questUnavailableHint">問題なし</span>
+                        ) : null}
+                      </div>
+                    </button>
+                  );
+                })()}
+              </div>
+
               {questShelfRows.map((row) => (
                 <div
                   className="questBookRow"
@@ -2342,10 +2498,12 @@ export function HomeScreen() {
                           <span className="questUnavailableBadge">準備中</span>
                         ) : null}
                       </div>
-                      <span>{subject.title}</span>
-                      {isSubjectUnavailable ? (
-                        <span className="questUnavailableHint">問題未登録</span>
-                      ) : null}
+                      <div className="questBookCardMeta">
+                        <span>{subject.title}</span>
+                        {isSubjectUnavailable ? (
+                          <span className="questUnavailableHint">問題未登録</span>
+                        ) : null}
+                      </div>
                     </button>
                     );
                   })}
@@ -2797,6 +2955,8 @@ export function HomeScreen() {
       rankingPeriodOptions[0];
     const currentRankingItem = studyRanking?.currentUser ?? null;
     const rankingItems = studyRanking?.ranking ?? [];
+    const rankingRewardInfo = studyRanking?.rewardInfo ?? null;
+    const latestRankingGrant = rankingRewardInfo?.recentGrants[0] ?? null;
 
     return (
       <main className="appShell">
@@ -2821,7 +2981,30 @@ export function HomeScreen() {
           <div className="rankingContent">
             <section className="rankingIntroCard">
               <h2>{selectedRankingOption.title}</h2>
-              <p>他のユーザーの学習量をチェックしよう</p>
+              <p>
+                {studyRanking?.range?.label
+                  ? `集計期間: ${studyRanking.range.label}`
+                  : "他のユーザーの学習量をチェックしよう"}
+              </p>
+              {rankingRewardInfo ? (
+                <div className="rankingRewardBanner" aria-label="ランキング報酬">
+                  <span className="rankingRewardBadge">{rankingRewardInfo.badgeLabel}</span>
+                  <p className="rankingRewardHeadline">{rankingRewardInfo.headline}</p>
+                  {rankingRewardInfo.description ? (
+                    <p className="rankingRewardDescription">{rankingRewardInfo.description}</p>
+                  ) : null}
+                  <p className="rankingRewardEncouragement">
+                    {rankingRewardInfo.encouragement}
+                  </p>
+                  {latestRankingGrant ? (
+                    <p className="rankingRewardRecent">
+                      最近の付与: {latestRankingGrant.pointsAwarded}pt（
+                      {latestRankingGrant.periodType === "week" ? "週間" : "月間"}・
+                      {latestRankingGrant.periodKey}）
+                    </p>
+                  ) : null}
+                </div>
+              ) : null}
               <div className="rankingPeriodTabs" aria-label="ランキング期間">
                 {rankingPeriodOptions.map((option) => (
                   <button
@@ -3036,8 +3219,14 @@ export function HomeScreen() {
                     </div>
                   ) : (
                     <div className="gachaMachineIdle">
-                      <span aria-hidden="true">✦</span>
-                      <strong>ガチャ</strong>
+                      <Image
+                        src="/gacha.jpg"
+                        alt=""
+                        className="gachaMachineIdleImage"
+                        width={780}
+                        height={780}
+                        priority
+                      />
                     </div>
                   )}
                 </div>

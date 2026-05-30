@@ -136,6 +136,110 @@ function shuffleQuestions<T>(items: T[]): T[] {
   return copy;
 }
 
+type QuestReviewItemRow = QuestQuestionDbRow & {
+  question_id: string;
+  answered_at: string;
+};
+
+function dedupeQuestionIds(rows: { question_id: string }[]): string[] {
+  const seenQuestionIds = new Set<string>();
+  const questionIds: string[] = [];
+
+  for (const row of rows) {
+    if (seenQuestionIds.has(row.question_id)) {
+      continue;
+    }
+
+    seenQuestionIds.add(row.question_id);
+    questionIds.push(row.question_id);
+  }
+
+  return questionIds;
+}
+
+function dedupeReviewItems(rows: QuestReviewItemRow[]): QuestReviewItemRow[] {
+  const seenQuestionIds = new Set<string>();
+  const uniqueRows: QuestReviewItemRow[] = [];
+
+  for (const row of rows) {
+    if (seenQuestionIds.has(row.question_id)) {
+      continue;
+    }
+
+    seenQuestionIds.add(row.question_id);
+    uniqueRows.push(row);
+  }
+
+  return uniqueRows;
+}
+
+function mapReviewItemToQuestionRow(row: QuestReviewItemRow): QuestQuestionDbRow {
+  return {
+    id: row.question_id,
+    subject_id: row.subject_id,
+    subcategory_id: row.subcategory_id,
+    body: row.body,
+    choice_1: row.choice_1,
+    choice_2: row.choice_2,
+    choice_3: row.choice_3,
+    choice_4: row.choice_4,
+    correct_index: row.correct_index,
+    explanation: row.explanation,
+    sort_order: row.sort_order ?? 0,
+  };
+}
+
+export async function countQuestReviewQuestions(
+  supabase: SupabaseClient,
+  gakuseiId: string,
+): Promise<{ count: number; error: string | null }> {
+  const { data, error } = await supabase
+    .from("quest_review_items")
+    .select("question_id, answered_at")
+    .eq("gakusei_id", gakuseiId)
+    .order("answered_at", { ascending: false });
+
+  if (error) {
+    return { count: 0, error: error.message };
+  }
+
+  return {
+    count: dedupeQuestionIds((data ?? []) as { question_id: string }[]).length,
+    error: null,
+  };
+}
+
+export async function fetchQuestReviewSessionQuestions(
+  supabase: SupabaseClient,
+  gakuseiId: string,
+): Promise<{ questions: QuestSessionQuestion[]; error: string | null }> {
+  const { data, error } = await supabase
+    .from("quest_review_items")
+    .select(
+      "question_id, subject_id, subcategory_id, body, choice_1, choice_2, choice_3, choice_4, correct_index, explanation, answered_at",
+    )
+    .eq("gakusei_id", gakuseiId)
+    .order("answered_at", { ascending: false });
+
+  if (error) {
+    return { questions: [], error: error.message };
+  }
+
+  const rows = (data ?? []) as QuestReviewItemRow[];
+  const dedupedRows = dedupeReviewItems(rows);
+
+  if (dedupedRows.length === 0) {
+    return { questions: [], error: "復習する問題がありません。" };
+  }
+
+  return {
+    questions: shuffleQuestions(dedupedRows).map((row, index) =>
+      mapQuestQuestionRow(mapReviewItemToQuestionRow(row), index + 1),
+    ),
+    error: null,
+  };
+}
+
 export async function fetchQuestSessionQuestions(
   supabase: SupabaseClient,
   subjectId: string,

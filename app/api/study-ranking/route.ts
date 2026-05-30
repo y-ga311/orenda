@@ -1,16 +1,19 @@
-import { createClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
+import {
+  RANKING_MONTHLY_FIRST_PLACE_PT,
+  RANKING_WEEKLY_FIRST_PLACE_PT,
+} from "@/lib/gachaConstants";
+import { listRecentRankingRewardGrants } from "@/lib/rankingRewards";
+import { aggregateStudyMinutes } from "@/lib/studyRankingCompute";
+import {
+  getJapanDateParts,
+  getPeriodRange,
+  type RankingPeriod,
+} from "@/lib/studyRankingPeriod";
+import { createServiceRoleSupabaseClient } from "@/lib/supabaseServiceRole";
 
 export const runtime = "nodejs";
-
-type StudySession = {
-  duration_minutes: number | null;
-  gakusei_id: string | null;
-  studied_at: string | null;
-};
-
-type RankingPeriod = "week" | "month" | "year" | "total";
 
 type Student = {
   avatar_icon_id: string | null;
@@ -32,40 +35,6 @@ type RankingStudent = {
 };
 
 const rankingPeriods: RankingPeriod[] = ["week", "month", "year", "total"];
-
-function getJapanDateParts(date = new Date()) {
-  const formatter = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Tokyo",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  });
-  const [year, month, day] = formatter.format(date).split("-").map(Number);
-
-  return { year, month, day };
-}
-
-function getJapanBoundaryIso(year: number, month: number, day: number) {
-  return new Date(Date.UTC(year, month - 1, day) - 9 * 60 * 60 * 1000).toISOString();
-}
-
-function addDaysToJapanDate(year: number, month: number, day: number, offset: number) {
-  const date = new Date(Date.UTC(year, month - 1, day + offset));
-
-  return {
-    year: date.getUTCFullYear(),
-    month: date.getUTCMonth() + 1,
-    day: date.getUTCDate(),
-  };
-}
-
-function getJapanDateKey(dateIso: string) {
-  const { year, month, day } = getJapanDateParts(new Date(dateIso));
-
-  return `${year}-${month.toString().padStart(2, "0")}-${day
-    .toString()
-    .padStart(2, "0")}`;
-}
 
 function formatStudyDays(dateKeys: Set<string>) {
   if (dateKeys.size <= 0) {
@@ -102,6 +71,44 @@ function buildRankingStudent({
   };
 }
 
+function formatPeriodRangeLabel(period: RankingPeriod, referenceDate = new Date()) {
+  const range = getPeriodRange(period, referenceDate);
+
+  if (!range.startIso || !range.endIso) {
+    return null;
+  }
+
+  const start = getJapanDateParts(new Date(range.startIso));
+  const end = getJapanDateParts(new Date(new Date(range.endIso).getTime() - 1));
+
+  const startLabel = `${start.month}/${start.day}`;
+  const endLabel = `${end.month}/${end.day}`;
+
+  return `${startLabel}〜${endLabel}`;
+}
+
+function buildRewardInfo(periodType: "week" | "month") {
+  if (periodType === "week") {
+    return {
+      periodType,
+      points: RANKING_WEEKLY_FIRST_PLACE_PT,
+      badgeLabel: "週間1位",
+      headline: `週間1位で ${RANKING_WEEKLY_FIRST_PLACE_PT}pt プレゼント`,
+      description: "",
+      encouragement: "今週の1位を目指して、毎日コツコツ学習しよう！",
+    };
+  }
+
+  return {
+    periodType,
+    points: RANKING_MONTHLY_FIRST_PLACE_PT,
+    badgeLabel: "月間1位",
+    headline: `月間1位で ${RANKING_MONTHLY_FIRST_PLACE_PT}pt プレゼント`,
+    description: "",
+    encouragement: "今月の1位を目指して、学習時間を積み上げよう！",
+  };
+}
+
 export async function GET(request: Request) {
   const cookieStore = await cookies();
   const currentStudentId = cookieStore.get("orenda_student_id")?.value;
@@ -113,96 +120,42 @@ export async function GET(request: Request) {
     );
   }
 
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const supabase = createServiceRoleSupabaseClient();
 
-  if (!supabaseUrl || !serviceRoleKey) {
+  if (!supabase) {
     return NextResponse.json(
       { message: "Supabase接続情報が未設定です。" },
       { status: 500 },
     );
   }
 
-  const supabase = createClient(supabaseUrl, serviceRoleKey, {
-    auth: {
-      persistSession: false,
-      autoRefreshToken: false,
-    },
-  });
-
-  const today = getJapanDateParts();
   const url = new URL(request.url);
   const requestedPeriod = url.searchParams.get("period");
   const period: RankingPeriod = rankingPeriods.includes(requestedPeriod as RankingPeriod)
     ? (requestedPeriod as RankingPeriod)
     : "week";
-  const dayOfWeek = new Date(Date.UTC(today.year, today.month - 1, today.day)).getUTCDay();
-  const weekStart = addDaysToJapanDate(
-    today.year,
-    today.month,
-    today.day,
-    -((dayOfWeek + 6) % 7),
-  );
-  const weekEnd = addDaysToJapanDate(weekStart.year, weekStart.month, weekStart.day, 7);
-  const nextMonth =
-    today.month === 12
-      ? { year: today.year + 1, month: 1, day: 1 }
-      : { year: today.year, month: today.month + 1, day: 1 };
-  const nextYear = { year: today.year + 1, month: 1, day: 1 };
-  const weekStartIso = getJapanBoundaryIso(weekStart.year, weekStart.month, weekStart.day);
-  const weekEndIso = getJapanBoundaryIso(weekEnd.year, weekEnd.month, weekEnd.day);
-  const monthStartIso = getJapanBoundaryIso(today.year, today.month, 1);
-  const nextMonthStartIso = getJapanBoundaryIso(
-    nextMonth.year,
-    nextMonth.month,
-    nextMonth.day,
-  );
-  const yearStartIso = getJapanBoundaryIso(today.year, 1, 1);
-  const nextYearStartIso = getJapanBoundaryIso(nextYear.year, nextYear.month, nextYear.day);
-  const periodRange = {
-    week: { startIso: weekStartIso, endIso: weekEndIso },
-    month: { startIso: monthStartIso, endIso: nextMonthStartIso },
-    year: { startIso: yearStartIso, endIso: nextYearStartIso },
-    total: { startIso: null, endIso: null },
-  }[period];
+  const periodRange = getPeriodRange(period);
+  const rangeLabel = formatPeriodRangeLabel(period);
 
-  let sessionsQuery = supabase
-    .from("study_sessions")
-    .select("gakusei_id, duration_minutes, studied_at");
+  let minutesByStudent: Map<string, number>;
+  let studyDateKeysByStudent: Map<string, Set<string>>;
 
-  if (periodRange.startIso && periodRange.endIso) {
-    sessionsQuery = sessionsQuery
-      .gte("studied_at", periodRange.startIso)
-      .lt("studied_at", periodRange.endIso);
-  }
+  try {
+    const aggregate = await aggregateStudyMinutes(
+      supabase,
+      periodRange.startIso,
+      periodRange.endIso,
+    );
+    minutesByStudent = aggregate.minutesByStudent;
+    studyDateKeysByStudent = aggregate.studyDateKeysByStudent;
+  } catch (error) {
+    console.error("[study-ranking] aggregateStudyMinutes:", error);
 
-  const { data: sessions, error: sessionsError } = await sessionsQuery;
-
-  if (sessionsError) {
     return NextResponse.json(
       { message: "ランキングの取得中にエラーが発生しました。" },
       { status: 500 },
     );
   }
-
-  const minutesByStudent = new Map<string, number>();
-  const studyDateKeysByStudent = new Map<string, Set<string>>();
-
-  ((sessions ?? []) as StudySession[]).forEach((session) => {
-    if (!session.gakusei_id || !session.studied_at) {
-      return;
-    }
-
-    minutesByStudent.set(
-      session.gakusei_id,
-      (minutesByStudent.get(session.gakusei_id) ?? 0) +
-        (session.duration_minutes ?? 0),
-    );
-
-    const dateKeys = studyDateKeysByStudent.get(session.gakusei_id) ?? new Set<string>();
-    dateKeys.add(getJapanDateKey(session.studied_at));
-    studyDateKeysByStudent.set(session.gakusei_id, dateKeys);
-  });
 
   const rankedStudentIds = [...minutesByStudent.entries()]
     .sort((a, b) => b[1] - a[1])
@@ -229,6 +182,7 @@ export async function GET(request: Request) {
     rankedStudentIds.map((studentId, index) => [studentId, index + 1]),
   );
   const currentStudent = studentById.get(currentStudentId);
+  const recentGrants = await listRecentRankingRewardGrants(supabase, currentStudentId, 3);
 
   return NextResponse.json({
     currentUser: currentStudent
@@ -258,13 +212,13 @@ export async function GET(request: Request) {
       ];
     }),
     period,
-    range: {
-      startDate: `${weekStart.year}-${weekStart.month
-        .toString()
-        .padStart(2, "0")}-${weekStart.day.toString().padStart(2, "0")}`,
-      endDate: `${weekEnd.year}-${weekEnd.month
-        .toString()
-        .padStart(2, "0")}-${weekEnd.day.toString().padStart(2, "0")}`,
-    },
+    range: rangeLabel ? { label: rangeLabel } : null,
+    rewardInfo:
+      period === "week" || period === "month"
+        ? {
+            ...buildRewardInfo(period),
+            recentGrants,
+          }
+        : null,
   });
 }

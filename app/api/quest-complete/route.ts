@@ -72,6 +72,79 @@ function parseAnswerLog(value: unknown): QuestAnswerLogEntry[] {
   });
 }
 
+function parseQuestScope(value: unknown): "subject" | "teacher" | "review" {
+  if (value === "teacher") {
+    return "teacher";
+  }
+
+  if (value === "review") {
+    return "review";
+  }
+
+  return "subject";
+}
+
+function buildAttemptAnswerRows(
+  attemptId: string,
+  answers: QuestAnswerLogEntry[],
+) {
+  const baseTime = Date.now();
+
+  return answers.map((entry, index) => ({
+    attempt_id: attemptId,
+    question_id: entry.questionId,
+    question_number: entry.questionNumber,
+    selected_index: entry.selectedIndex,
+    is_correct: entry.isCorrect,
+    answered_at: new Date(baseTime + index).toISOString(),
+  }));
+}
+
+async function saveQuestAttemptHistory(
+  supabase: NonNullable<ReturnType<typeof createServiceRoleSupabaseClient>>,
+  params: {
+    studentId: string;
+    questScope: "subject" | "review";
+    subjectId: string | null;
+    subcategoryIds: string[];
+    questionCount: number;
+    correctCount: number;
+    pointsEarned: number;
+    answers: QuestAnswerLogEntry[];
+  },
+): Promise<void> {
+  const { data: attemptRow, error: attemptError } = await supabase
+    .from("quest_attempts")
+    .insert({
+      gakusei_id: params.studentId,
+      quest_scope: params.questScope,
+      subject_id: params.subjectId,
+      subcategory_ids: params.subcategoryIds,
+      question_count: params.questionCount,
+      correct_count: params.correctCount,
+      points_earned: params.pointsEarned,
+    })
+    .select("id")
+    .maybeSingle();
+
+  if (attemptError) {
+    console.error("[quest-complete] quest_attempts:", attemptError.message);
+    return;
+  }
+
+  if (!attemptRow?.id || params.answers.length === 0) {
+    return;
+  }
+
+  const { error: answersError } = await supabase
+    .from("quest_attempt_answers")
+    .insert(buildAttemptAnswerRows(attemptRow.id, params.answers));
+
+  if (answersError) {
+    console.error("[quest-complete] quest_attempt_answers:", answersError.message);
+  }
+}
+
 export async function POST(request: Request) {
   const cookieStore = await cookies();
   const studentId = cookieStore.get("orenda_student_id")?.value;
@@ -90,8 +163,7 @@ export async function POST(request: Request) {
     typeof body?.correctCount === "number" ? body.correctCount : -1;
   const questionCount =
     typeof body?.questionCount === "number" ? body.questionCount : null;
-  const questScope =
-    body?.questScope === "teacher" ? "teacher" : "subject";
+  const questScope = parseQuestScope(body?.questScope);
   const subjectId =
     typeof body?.subjectId === "string" ? body.subjectId.trim() : null;
   const subcategoryIds = parseSubcategoryIds(body);
@@ -157,42 +229,29 @@ export async function POST(request: Request) {
   }
 
   if (questScope === "subject" && subjectId && questionCount !== null) {
-    const { data: attemptRow, error: attemptError } = await supabase
-      .from("quest_attempts")
-      .insert({
-        gakusei_id: studentId,
-        quest_scope: questScope,
-        subject_id: subjectId,
-        subcategory_ids: subcategoryIds,
-        question_count: questionCount,
-        correct_count: correctCount,
-        points_earned: pointsEarned,
-      })
-      .select("id")
-      .maybeSingle();
+    await saveQuestAttemptHistory(supabase, {
+      studentId,
+      questScope: "subject",
+      subjectId,
+      subcategoryIds,
+      questionCount,
+      correctCount,
+      pointsEarned,
+      answers,
+    });
+  }
 
-    if (attemptError) {
-      console.error("[quest-complete] quest_attempts:", attemptError.message);
-    } else if (attemptRow?.id && answers.length > 0) {
-      const { error: answersError } = await supabase
-        .from("quest_attempt_answers")
-        .insert(
-          answers.map((entry) => ({
-            attempt_id: attemptRow.id,
-            question_id: entry.questionId,
-            question_number: entry.questionNumber,
-            selected_index: entry.selectedIndex,
-            is_correct: entry.isCorrect,
-          })),
-        );
-
-      if (answersError) {
-        console.error(
-          "[quest-complete] quest_attempt_answers:",
-          answersError.message,
-        );
-      }
-    }
+  if (questScope === "review" && questionCount !== null && answers.length > 0) {
+    await saveQuestAttemptHistory(supabase, {
+      studentId,
+      questScope: "review",
+      subjectId: null,
+      subcategoryIds: [],
+      questionCount,
+      correctCount,
+      pointsEarned,
+      answers,
+    });
   }
 
   return NextResponse.json({

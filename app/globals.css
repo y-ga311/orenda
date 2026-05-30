@@ -714,44 +714,12 @@ button {
   flex-shrink: 0;
 }
 
-.questDailyCard {
-  display: grid;
-  flex-shrink: 0;
-  gap: 8px;
-  border: 1px solid #e5e5ea;
-  border-radius: 12px;
-  padding: 8px;
-  background: #fff;
-  color: #1d1d1f;
-  text-align: center;
+.questSpecialCard {
   cursor: pointer;
 }
 
-.questDailyCoverWrap {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
-  border-radius: 8px;
-  background: #fff;
-  min-height: 160px;
-  max-height: min(42svh, 260px);
-}
-
-.questDailyCover {
-  width: 100%;
-  height: auto;
-  max-height: min(42svh, 260px);
-  object-fit: contain;
-}
-
-.questDailyTitle {
-  font-size: 11px;
-  font-weight: 400;
-  line-height: 1.35;
-}
-
 .questShelf {
+  --quest-book-cover-height: 120px;
   display: flex;
   flex: 1;
   flex-direction: column;
@@ -759,6 +727,75 @@ button {
   min-height: 0;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
+}
+
+.questShelf .questBookCard {
+  display: grid;
+  grid-template-rows: var(--quest-book-cover-height) minmax(40px, auto);
+  align-content: start;
+  height: 100%;
+}
+
+.questShelf .questBookRow {
+  align-items: stretch;
+}
+
+.questBookCoverWrap {
+  position: relative;
+  overflow: hidden;
+  width: 100%;
+  height: var(--quest-book-cover-height);
+  border-radius: 8px;
+}
+
+.questShelf .subjectCover {
+  width: 100%;
+  height: 100%;
+}
+
+.questTeacherCoverWrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #fff;
+}
+
+.questTeacherCover {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: center bottom;
+}
+
+.questReviewCoverWrap {
+  background: #fff;
+}
+
+.questReviewCover {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: center;
+}
+
+.questBookCardMeta {
+  display: grid;
+  gap: 2px;
+  align-content: center;
+  justify-items: center;
+  min-height: 40px;
+}
+
+.questBookCardMeta > span:first-child {
+  overflow: hidden;
+  width: 100%;
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.questBookCardUnavailable .questReviewCoverWrap {
+  background: #f2f2f7;
 }
 
 .questBookRow {
@@ -771,11 +808,7 @@ button {
   cursor: pointer;
 }
 
-.questBookCoverWrap {
-  position: relative;
-}
-
-.questBookCardUnavailable {
+.questBookCoverUnavailable {
   cursor: not-allowed;
   opacity: 0.72;
   background: #f2f2f7;
@@ -1795,6 +1828,54 @@ button {
   font-size: 13px;
 }
 
+.rankingRewardBanner {
+  display: grid;
+  gap: 6px;
+  border: 1px solid #fcd34d;
+  border-radius: 14px;
+  padding: 12px;
+  background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
+}
+
+.rankingRewardBadge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  border-radius: 999px;
+  padding: 0 10px;
+  background: #f59e0b;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.rankingRewardHeadline {
+  margin: 0;
+  color: #92400e;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.rankingRewardDescription,
+.rankingRewardEncouragement,
+.rankingRewardRecent {
+  margin: 0;
+  color: #78350f;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.rankingRewardEncouragement {
+  font-weight: 700;
+}
+
+.rankingRewardRecent {
+  border-top: 1px solid rgba(245, 158, 11, 0.35);
+  padding-top: 6px;
+  color: #92400e;
+  font-size: 11px;
+}
+
 .rankingPeriodTabs {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -2374,19 +2455,19 @@ button {
 
 .gachaMachineIdle {
   display: grid;
-  gap: 12px;
+  width: 100%;
+  height: 100%;
+  min-height: min(42svh, 280px);
   place-items: center;
-  color: #5b21b6;
 }
 
-.gachaMachineIdle span {
-  color: #7c3aed;
-  font-size: 46px;
-  line-height: 1;
-}
-
-.gachaMachineIdle strong {
-  font-size: 15px;
+.gachaMachineIdleImage {
+  width: 100%;
+  height: 100%;
+  min-height: min(42svh, 280px);
+  border-radius: 22px;
+  object-fit: cover;
+  object-position: center;
 }
 
 .gachaResult {
