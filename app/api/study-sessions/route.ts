@@ -1,8 +1,8 @@
 import { createClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
+import { awardStudentGachaPoints } from "@/lib/awardStudentGachaPoints";
 import { GACHA_POINTS_PER_STUDY_MINUTE } from "@/lib/gachaConstants";
-import { normalizeGachaPoints } from "@/lib/normalizeGachaPoints";
 
 export const runtime = "nodejs";
 
@@ -52,81 +52,15 @@ export async function POST(request: Request) {
   });
 
   const pointsEarned = durationMinutes * GACHA_POINTS_PER_STUDY_MINUTE;
+  const result = await awardStudentGachaPoints(supabase, studentId, pointsEarned);
 
-  const { data: rpcBalance, error: rpcError } = await supabase.rpc("award_gacha_points", {
-    p_gakusei_id: studentId,
-    p_amount: pointsEarned,
-  });
-
-  if (!rpcError) {
-    const gachaPoints = normalizeGachaPoints(rpcBalance);
-
-    return NextResponse.json({
-      ok: true,
-      gachaPoints,
-      pointsEarned,
-    });
-  }
-
-  const haystack = `${rpcError.message ?? ""} ${"details" in rpcError ? String(rpcError.details ?? "") : ""} ${"hint" in rpcError ? String(rpcError.hint ?? "") : ""}`.toLowerCase();
-
-  const rpcUnavailable =
-    haystack.includes("could not find") ||
-    haystack.includes("schema cache") ||
-    haystack.includes("does not exist") ||
-    (haystack.includes("award_gacha_points") && haystack.includes("function"));
-
-  if (!rpcUnavailable) {
-    console.error("[study-sessions] award_gacha_points:", rpcError.message);
-
-    if (haystack.includes("student_not_found")) {
-      return NextResponse.json({ message: "ユーザー情報が見つかりません。" }, { status: 404 });
-    }
-
-    return NextResponse.json(
-      { message: "gacha_points の更新に失敗しました。" },
-      { status: 500 },
-    );
-  }
-
-  const { data: currentRow, error: selectError } = await supabase
-    .from("students")
-    .select("gacha_points")
-    .eq("gakusei_id", studentId)
-    .maybeSingle();
-
-  if (selectError || !currentRow) {
-    return NextResponse.json(
-      { message: "ユーザー情報が見つかりません。" },
-      { status: 404 },
-    );
-  }
-
-  const nextGachaPoints =
-    normalizeGachaPoints(
-      (currentRow as { gacha_points?: unknown }).gacha_points,
-    ) + pointsEarned;
-
-  const { data: updatedRow, error: updateError } = await supabase
-    .from("students")
-    .update({ gacha_points: nextGachaPoints })
-    .eq("gakusei_id", studentId)
-    .select("gacha_points")
-    .maybeSingle();
-
-  if (updateError || !updatedRow) {
-    console.error("[study-sessions] update gacha_points:", updateError?.message);
-    return NextResponse.json(
-      { message: "gacha_points の更新に失敗しました。" },
-      { status: 500 },
-    );
+  if (!result.ok) {
+    return NextResponse.json({ message: result.message }, { status: result.status });
   }
 
   return NextResponse.json({
     ok: true,
-    gachaPoints: normalizeGachaPoints(
-      (updatedRow as { gacha_points?: unknown }).gacha_points,
-    ),
-    pointsEarned,
+    gachaPoints: result.gachaPoints,
+    pointsEarned: result.pointsEarned,
   });
 }

@@ -37,6 +37,26 @@ import tourinCardImage from "@/source-images/tourin_card.png";
 import { avatarIcons, getAvatarIcon, type AvatarIconId } from "@/lib/avatarIcons";
 import { GACHA_SPIN_COST_PT } from "@/lib/gachaConstants";
 import { normalizeGachaPoints } from "@/lib/normalizeGachaPoints";
+import {
+  getDailyQuestQuestion,
+  getQuestQuestion,
+  isQuestAnswerCorrect,
+} from "@/lib/questQuestions";
+import {
+  formatQuestQuestionCountLabel,
+  getDefaultQuestQuestionCount,
+  getQuestQuestionCountHint,
+  getQuestSubcategories,
+  getSelectableQuestQuestionCounts,
+  normalizeSelectedQuestQuestionCount,
+  pickQuestSubcategoryForQuestionIndex,
+  shouldShowQuestSubcategoryCountBadge,
+  type QuestQuestionCount,
+} from "@/lib/questSubcategories";
+import {
+  getQuestAvailableQuestionCount,
+  getQuestAvailableQuestionCountForSubcategories,
+} from "@/lib/questQuestionInventory";
 import { getStudyType, studyTypes } from "@/lib/studyTypes";
 import { parseStudyTypeId, type StudyTypeId } from "@/lib/studyTypeIds";
 
@@ -414,6 +434,23 @@ export function HomeScreen() {
   );
   const [studyTypeMessage, setStudyTypeMessage] = useState("");
   const [isStudyTypeSubmitting, setIsStudyTypeSubmitting] = useState(false);
+  const [questView, setQuestView] = useState<
+    "select" | "setup" | "question" | "result"
+  >("select");
+  const [selectedQuestSubject, setSelectedQuestSubject] =
+    useState<StudySubject | null>(null);
+  const [selectedQuestSubcategoryIds, setSelectedQuestSubcategoryIds] = useState<
+    string[]
+  >([]);
+  const [selectedQuestQuestionCount, setSelectedQuestQuestionCount] =
+    useState<QuestQuestionCount>(10);
+  const [questQuestionIndex, setQuestQuestionIndex] = useState(0);
+  const [isDailyQuest, setIsDailyQuest] = useState(false);
+  const [selectedQuestChoice, setSelectedQuestChoice] = useState<number | null>(null);
+  const [questAnswerSubmitted, setQuestAnswerSubmitted] = useState(false);
+  const [questCorrectCount, setQuestCorrectCount] = useState(0);
+  const [isQuestCompleting, setIsQuestCompleting] = useState(false);
+  const [questCompleteMessage, setQuestCompleteMessage] = useState("");
   const [message, setMessage] = useState("");
   const [loginSuccessNotice, setLoginSuccessNotice] = useState<{
     dailyBonusAwarded: boolean;
@@ -861,6 +898,171 @@ export function HomeScreen() {
     setStopwatchReturnScreen("timer");
     setGachaPoints(0);
     setGachaChargeMessage("");
+    setQuestView("select");
+    setSelectedQuestSubject(null);
+    setSelectedQuestSubcategoryIds([]);
+    setSelectedQuestQuestionCount(10);
+    setQuestQuestionIndex(0);
+    setIsDailyQuest(false);
+    setSelectedQuestChoice(null);
+    setQuestAnswerSubmitted(false);
+    setQuestCorrectCount(0);
+    setIsQuestCompleting(false);
+    setQuestCompleteMessage("");
+  }
+
+  function resetQuestScreen() {
+    setQuestView("select");
+    setSelectedQuestSubject(null);
+    setSelectedQuestSubcategoryIds([]);
+    setSelectedQuestQuestionCount(10);
+    setQuestQuestionIndex(0);
+    setIsDailyQuest(false);
+    setSelectedQuestChoice(null);
+    setQuestAnswerSubmitted(false);
+    setQuestCorrectCount(0);
+    setIsQuestCompleting(false);
+    setQuestCompleteMessage("");
+  }
+
+  function openQuestSetup(subject: StudySubject) {
+    const subcategories = getQuestSubcategories(subject.id);
+    const initialSubcategoryIds = subcategories[0] ? [subcategories[0].id] : [];
+    const availableCount = getQuestAvailableQuestionCountForSubcategories(
+      subject.id,
+      initialSubcategoryIds,
+    );
+
+    setSelectedQuestSubject(subject);
+    setIsDailyQuest(false);
+    setSelectedQuestSubcategoryIds(initialSubcategoryIds);
+    setSelectedQuestQuestionCount(getDefaultQuestQuestionCount(availableCount));
+    setQuestQuestionIndex(0);
+    setSelectedQuestChoice(null);
+    setQuestAnswerSubmitted(false);
+    setQuestCorrectCount(0);
+    setIsQuestCompleting(false);
+    setQuestCompleteMessage("");
+    setQuestView("setup");
+  }
+
+  function startQuestQuestions() {
+    if (!selectedQuestSubject || selectedQuestSubcategoryIds.length === 0) {
+      return;
+    }
+
+    const availableCount = getQuestAvailableQuestionCountForSubcategories(
+      selectedQuestSubject.id,
+      selectedQuestSubcategoryIds,
+    );
+
+    setSelectedQuestQuestionCount((current) =>
+      normalizeSelectedQuestQuestionCount(availableCount, current),
+    );
+    setQuestQuestionIndex(0);
+    setSelectedQuestChoice(null);
+    setQuestAnswerSubmitted(false);
+    setQuestCorrectCount(0);
+    setIsQuestCompleting(false);
+    setQuestCompleteMessage("");
+    setQuestView("question");
+  }
+
+  function openDailyQuestQuestion() {
+    const pick = studySubjects[Math.floor(Math.random() * studySubjects.length)];
+    if (!pick) {
+      return;
+    }
+
+    setSelectedQuestSubject(pick);
+    setIsDailyQuest(true);
+    setSelectedQuestSubcategoryIds([]);
+    setSelectedQuestQuestionCount(10);
+    setQuestQuestionIndex(0);
+    setSelectedQuestChoice(null);
+    setQuestAnswerSubmitted(false);
+    setQuestCorrectCount(0);
+    setIsQuestCompleting(false);
+    setQuestCompleteMessage("");
+    setQuestView("question");
+  }
+
+  async function completeQuestAndShowResult() {
+    if (isQuestCompleting) {
+      return;
+    }
+
+    setIsQuestCompleting(true);
+    setQuestCompleteMessage("");
+
+    const response = await fetch("/api/quest-complete", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        correctCount: questCorrectCount,
+        questionCount: selectedQuestQuestionCount,
+        ...(isDailyQuest ||
+        !selectedQuestSubject ||
+        selectedQuestSubcategoryIds.length === 0
+          ? {}
+          : {
+              subjectId: selectedQuestSubject.id,
+              subcategoryIds: selectedQuestSubcategoryIds,
+            }),
+      }),
+    }).catch(() => null);
+
+    setIsQuestCompleting(false);
+
+    if (!response?.ok) {
+      const result = (await response?.json().catch(() => null)) as {
+        message?: string;
+      } | null;
+      setQuestCompleteMessage(
+        result?.message ?? "ガチャポイントを付与できませんでした。",
+      );
+      return;
+    }
+
+    const result = (await response.json().catch(() => null)) as {
+      gachaPoints?: unknown;
+    } | null;
+
+    setGachaPoints(normalizeGachaPoints(result?.gachaPoints));
+    setSelectedQuestChoice(null);
+    setQuestAnswerSubmitted(false);
+    setQuestCompleteMessage("");
+    setQuestView("result");
+  }
+
+  function goToNextQuestQuestion() {
+    if (questQuestionIndex + 1 >= selectedQuestQuestionCount) {
+      void completeQuestAndShowResult();
+      return;
+    }
+
+    setQuestQuestionIndex((current) => current + 1);
+    setSelectedQuestChoice(null);
+    setQuestAnswerSubmitted(false);
+  }
+
+  function getQuestChoiceClassName(
+    index: number,
+    correctIndex: number,
+  ): string {
+    if (!questAnswerSubmitted || selectedQuestChoice === null) {
+      return "questChoice";
+    }
+
+    if (index === selectedQuestChoice) {
+      return index === correctIndex
+        ? "questChoice questChoiceCorrect"
+        : "questChoice questChoiceWrong";
+    }
+
+    return "questChoice questChoiceMuted";
   }
 
   function openStopwatch(subject: StudySubject, returnTo: "timer" | "quest" = "timer") {
@@ -1400,6 +1602,420 @@ export function HomeScreen() {
       questShelfRows.push(studySubjects.slice(i, i + 2));
     }
 
+    const questBottomNav = (
+      <nav className="timerBottomNav questTabBar" aria-label="下部ナビゲーション">
+        <button
+          className="timerNavItem"
+          type="button"
+          onClick={() => {
+            resetQuestScreen();
+            setActiveScreen("timer");
+          }}
+        >
+          <span aria-hidden="true">⏱</span>
+          タイマー
+        </button>
+        <button className="timerNavItem timerNavItemActive" type="button">
+          <span aria-hidden="true">📋</span>
+          問題
+        </button>
+        <button
+          className="timerNavItem"
+          type="button"
+          onClick={() => {
+            resetQuestScreen();
+            setActiveScreen("record");
+          }}
+        >
+          <span aria-hidden="true">⌛</span>
+          タイム
+        </button>
+        <button
+          className="timerNavItem"
+          type="button"
+          onClick={() => {
+            resetQuestScreen();
+            setActiveScreen("collection");
+          }}
+        >
+          <span aria-hidden="true">▣</span>
+          カード
+        </button>
+        <button
+          className="timerNavItem"
+          type="button"
+          onClick={() => {
+            resetQuestScreen();
+            setActiveScreen("ranking");
+          }}
+        >
+          <span aria-hidden="true">👥</span>
+          交流
+        </button>
+      </nav>
+    );
+
+    if (questView === "question" && selectedQuestSubject) {
+      const questionNumber = questQuestionIndex + 1;
+      const activeSubcategoryId = isDailyQuest
+        ? null
+        : pickQuestSubcategoryForQuestionIndex(
+            selectedQuestSubcategoryIds,
+            questQuestionIndex,
+          );
+      const currentQuest = isDailyQuest
+        ? getDailyQuestQuestion(questionNumber)
+        : getQuestQuestion({
+            subjectId: selectedQuestSubject.id,
+            subjectTitle: selectedQuestSubject.title,
+            subcategoryId: activeSubcategoryId,
+            questionNumber,
+            questionCount: selectedQuestQuestionCount,
+          });
+      const isCorrect = isQuestAnswerCorrect(currentQuest, selectedQuestChoice);
+      const isLastQuestion = questionNumber >= selectedQuestQuestionCount;
+
+      return (
+        <main className="appShell">
+          <section
+            className="phoneFrame timerScreen questScreen"
+            aria-label="クエスト問題"
+            style={{ backgroundImage: `url(${backgroundImage.src})` }}
+          >
+            <header className="timerHeader">
+              <button
+                className="timerBackButton"
+                type="button"
+                onClick={() => {
+                  setSelectedQuestChoice(null);
+                  setQuestAnswerSubmitted(false);
+                  setQuestView(isDailyQuest ? "select" : "setup");
+                }}
+              >
+                <span aria-hidden="true">‹</span>
+                戻る
+              </button>
+              <h1>クエスト</h1>
+              <span className="timerHeaderBalance" aria-hidden="true" />
+            </header>
+
+            <div className="questQuestionMain">
+              <p className="questQuestionProgress" aria-live="polite">
+                問{questionNumber}/{selectedQuestQuestionCount}
+              </p>
+
+              <article className="questQuestionCard" aria-labelledby="quest-question-label">
+                <p className="questQuestionNumber" id="quest-question-label">
+                  問{currentQuest.id}
+                </p>
+                <p className="questQuestionBody">{currentQuest.body}</p>
+              </article>
+
+              <div
+                className="questChoiceList"
+                role="listbox"
+                aria-label={`問${currentQuest.id}の選択肢`}
+              >
+                {currentQuest.choices.map((choice, index) => (
+                  <button
+                    className={getQuestChoiceClassName(index, currentQuest.correctIndex)}
+                    key={`${selectedQuestSubject.id}-${questQuestionIndex}-${index}`}
+                    type="button"
+                    role="option"
+                    aria-selected={selectedQuestChoice === index}
+                    disabled={questAnswerSubmitted}
+                    onClick={() => {
+                      if (questAnswerSubmitted) {
+                        return;
+                      }
+
+                      setSelectedQuestChoice(index);
+                      setQuestAnswerSubmitted(true);
+                      if (index === currentQuest.correctIndex) {
+                        setQuestCorrectCount((current) => current + 1);
+                      }
+                    }}
+                  >
+                    <span className="questChoiceBadge" aria-hidden="true">
+                      {index + 1}
+                    </span>
+                    <span className="questChoiceLabel">{choice}</span>
+                  </button>
+                ))}
+              </div>
+
+              {questAnswerSubmitted && selectedQuestChoice !== null ? (
+                <>
+                  <section
+                    className={
+                      isCorrect
+                        ? "questResultPanel questResultPanelCorrect"
+                        : "questResultPanel questResultPanelWrong"
+                    }
+                    aria-live="polite"
+                    aria-label={isCorrect ? "正解" : "不正解"}
+                  >
+                    <div
+                      className={
+                        isCorrect
+                          ? "questResultIcon questResultIconCorrect"
+                          : "questResultIcon questResultIconWrong"
+                      }
+                      aria-hidden="true"
+                    >
+                      {isCorrect ? "✓" : "✕"}
+                    </div>
+                    <p className="questResultLabel">
+                      {isCorrect ? "正解" : "不正解"}
+                    </p>
+                    <p className="questResultExplanation">{currentQuest.explanation}</p>
+                  </section>
+
+                  <button
+                    className="profileSubmitButton questNextButton"
+                    disabled={isQuestCompleting}
+                    type="button"
+                    onClick={goToNextQuestQuestion}
+                  >
+                    {isQuestCompleting
+                      ? "結果を保存中..."
+                      : isLastQuestion
+                        ? "結果を見る"
+                        : "次の問題へ"}
+                  </button>
+                  {questCompleteMessage ? (
+                    <p className="formMessage" role="alert">
+                      {questCompleteMessage}
+                    </p>
+                  ) : null}
+                </>
+              ) : null}
+            </div>
+          </section>
+        </main>
+      );
+    }
+
+    if (questView === "result") {
+      const questWrongCount = selectedQuestQuestionCount - questCorrectCount;
+      const questAccuracy =
+        selectedQuestQuestionCount > 0
+          ? Math.round((questCorrectCount / selectedQuestQuestionCount) * 100)
+          : 0;
+
+      return (
+        <main className="appShell">
+          <section
+            className="phoneFrame timerScreen questScreen"
+            aria-label="クエスト結果"
+            style={{ backgroundImage: `url(${backgroundImage.src})` }}
+          >
+            <header className="timerHeader">
+              <button
+                className="timerBackButton"
+                type="button"
+                onClick={resetQuestScreen}
+              >
+                <span aria-hidden="true">‹</span>
+                戻る
+              </button>
+              <h1>クエスト</h1>
+              <span className="timerHeaderBalance" aria-hidden="true" />
+            </header>
+
+            <div className="questResultMain">
+              <section className="questResultArea" aria-label="結果">
+                <div className="questScorePointsRow">
+                  <article className="questScoreCard">
+                    <p className="questScoreCardLabel">今回のスコア</p>
+                    <p className="questScoreCardValue">
+                      {questCorrectCount} / {selectedQuestQuestionCount}
+                    </p>
+                    <p className="questScoreCardRate">正解率 {questAccuracy}%</p>
+                  </article>
+
+                  <article className="questGachaEarnCard">
+                    <p className="questGachaEarnLabel">カードガチャ</p>
+                    <p className="questGachaEarnValue">+{questCorrectCount} pt</p>
+                  </article>
+                </div>
+
+                <div className="questStatsRow">
+                  <article className="questStatCorrect">
+                    <p className="questStatLabel">正解</p>
+                    <p className="questStatValue">{questCorrectCount}</p>
+                  </article>
+                  <article className="questStatWrong">
+                    <p className="questStatLabel">不正解</p>
+                    <p className="questStatValue">{questWrongCount}</p>
+                  </article>
+                </div>
+
+                <p className="questResultHint">
+                  間違えた問題は復習リストから再度確認できます。
+                </p>
+
+                <button
+                  className="profileSubmitButton"
+                  type="button"
+                  onClick={resetQuestScreen}
+                >
+                  科目一覧に戻る
+                </button>
+              </section>
+            </div>
+          </section>
+        </main>
+      );
+    }
+
+    if (questView === "setup" && selectedQuestSubject) {
+      const subcategories = getQuestSubcategories(selectedQuestSubject.id);
+      const availableQuestionCount = getQuestAvailableQuestionCountForSubcategories(
+        selectedQuestSubject.id,
+        selectedQuestSubcategoryIds,
+      );
+      const selectableQuestionCounts =
+        getSelectableQuestQuestionCounts(availableQuestionCount);
+
+      const questionCountHint = getQuestQuestionCountHint(
+        availableQuestionCount,
+        selectedQuestSubcategoryIds.length,
+      );
+      const canStartQuest =
+        selectedQuestSubcategoryIds.length > 0 &&
+        availableQuestionCount > 0 &&
+        selectableQuestionCounts.length > 0;
+
+      const subjectId = selectedQuestSubject.id;
+
+      function toggleQuestSubcategory(subcategoryId: string) {
+        const nextSubcategoryIds = selectedQuestSubcategoryIds.includes(subcategoryId)
+          ? selectedQuestSubcategoryIds.filter((id) => id !== subcategoryId)
+          : [...selectedQuestSubcategoryIds, subcategoryId];
+        const nextAvailableCount = getQuestAvailableQuestionCountForSubcategories(
+          subjectId,
+          nextSubcategoryIds,
+        );
+
+        setSelectedQuestSubcategoryIds(nextSubcategoryIds);
+        setSelectedQuestQuestionCount((current) =>
+          normalizeSelectedQuestQuestionCount(nextAvailableCount, current),
+        );
+      }
+
+      return (
+        <main className="appShell">
+          <section
+            className="phoneFrame timerScreen questScreen"
+            aria-label="クエスト設定"
+            style={{ backgroundImage: `url(${backgroundImage.src})` }}
+          >
+            <header className="timerHeader">
+              <button
+                className="timerBackButton"
+                type="button"
+                onClick={() => {
+                  setSelectedQuestSubject(null);
+                  setSelectedQuestSubcategoryIds([]);
+                  setQuestView("select");
+                }}
+              >
+                <span aria-hidden="true">‹</span>
+                戻る
+              </button>
+              <h1>クエスト</h1>
+              <span className="timerHeaderBalance" aria-hidden="true" />
+            </header>
+
+            <div className="questSetupMain">
+              <section className="questSetupCard">
+                <h2 className="questSetupTitle">{selectedQuestSubject.title}</h2>
+                <p className="questSetupLead">
+                  中分類（複数選択可）と問題数を選んでください。
+                </p>
+
+                <fieldset className="questSetupFieldset">
+                  <legend>中分類</legend>
+                  {subcategories.length > 5 ? (
+                    <p className="questScrollHint questSetupScrollHint">
+                      <span aria-hidden="true">⇅</span>
+                      上下にスクロールして中分類を選べます（複数可）
+                    </p>
+                  ) : null}
+                  <div className="questSubcategoryList">
+                    {subcategories.map((subcategory) => {
+                      const subcategoryAvailableCount = getQuestAvailableQuestionCount(
+                        subjectId,
+                        subcategory.id,
+                      );
+                      const isSelected = selectedQuestSubcategoryIds.includes(
+                        subcategory.id,
+                      );
+
+                      return (
+                      <label className="questSubcategoryOption" key={subcategory.id}>
+                        <input
+                          checked={isSelected}
+                          name={`questSubcategory-${subcategory.id}`}
+                          onChange={() => toggleQuestSubcategory(subcategory.id)}
+                          type="checkbox"
+                          value={subcategory.id}
+                        />
+                        <span>{subcategory.label}</span>
+                        {shouldShowQuestSubcategoryCountBadge(
+                          subcategoryAvailableCount,
+                        ) ? (
+                          <span className="questSubcategoryCount">
+                            全{subcategoryAvailableCount}問
+                          </span>
+                        ) : null}
+                      </label>
+                      );
+                    })}
+                  </div>
+                </fieldset>
+
+                <fieldset className="questSetupFieldset">
+                  <legend>問題数</legend>
+                  {questionCountHint ? (
+                    <p className="questSetupNote">{questionCountHint}</p>
+                  ) : null}
+                  {selectableQuestionCounts.length > 0 ? (
+                  <div className="questCountTabs" role="group" aria-label="問題数">
+                    {selectableQuestionCounts.map((count) => (
+                      <button
+                        className={
+                          selectedQuestQuestionCount === count
+                            ? "questCountTab questCountTabActive"
+                            : "questCountTab"
+                        }
+                        key={count}
+                        type="button"
+                        onClick={() => setSelectedQuestQuestionCount(count)}
+                      >
+                        {formatQuestQuestionCountLabel(count, availableQuestionCount)}
+                      </button>
+                    ))}
+                  </div>
+                  ) : null}
+                </fieldset>
+
+                <button
+                  className="profileSubmitButton"
+                  disabled={!canStartQuest}
+                  type="button"
+                  onClick={startQuestQuestions}
+                >
+                  問題を開始
+                </button>
+              </section>
+            </div>
+          </section>
+        </main>
+      );
+    }
+
     return (
       <main className="appShell">
         <section
@@ -1411,7 +2027,10 @@ export function HomeScreen() {
             <button
               className="timerBackButton"
               type="button"
-              onClick={() => setActiveScreen("menu")}
+              onClick={() => {
+                resetQuestScreen();
+                setActiveScreen("menu");
+              }}
             >
               <span aria-hidden="true">‹</span>
               戻る
@@ -1436,13 +2055,7 @@ export function HomeScreen() {
             <button
               className="questDailyCard"
               type="button"
-              onClick={() => {
-                const pick =
-                  studySubjects[Math.floor(Math.random() * studySubjects.length)];
-                if (pick) {
-                  openStopwatch(pick, "quest");
-                }
-              }}
+              onClick={openDailyQuestQuestion}
             >
               <div className="questDailyCoverWrap">
                 <Image
@@ -1452,21 +2065,21 @@ export function HomeScreen() {
                   priority
                 />
               </div>
-              <span className="questDailyTitle">教員クエスト</span>
+              <span className="questDailyTitle">デイリークエスト(ランダム10問)</span>
             </button>
 
             <div className="questShelf" aria-label="科目別クエスト">
               {questShelfRows.map((row) => (
                 <div
                   className="questBookRow"
-                  key={row.map((s) => s.id).join("-")}
+                  key={row.map((subject) => subject.id).join("-")}
                 >
                   {row.map((subject) => (
                     <button
                       className="subjectCard questBookCard"
                       key={subject.id}
                       type="button"
-                      onClick={() => openStopwatch(subject, "quest")}
+                      onClick={() => openQuestSetup(subject)}
                     >
                       <Image src={subject.image} alt="" className="subjectCover" />
                       <span>{subject.title}</span>
@@ -1477,44 +2090,7 @@ export function HomeScreen() {
             </div>
           </div>
 
-          <nav className="timerBottomNav" aria-label="下部ナビゲーション">
-            <button
-              className="timerNavItem"
-              type="button"
-              onClick={() => setActiveScreen("timer")}
-            >
-              <span aria-hidden="true">⏱</span>
-              タイマー
-            </button>
-            <button className="timerNavItem timerNavItemActive" type="button">
-              <span aria-hidden="true">📋</span>
-              問題
-            </button>
-            <button
-              className="timerNavItem"
-              type="button"
-              onClick={() => setActiveScreen("record")}
-            >
-              <span aria-hidden="true">⌛</span>
-              タイム
-            </button>
-            <button
-              className="timerNavItem"
-              type="button"
-              onClick={() => setActiveScreen("collection")}
-            >
-              <span aria-hidden="true">▣</span>
-              カード
-            </button>
-            <button
-              className="timerNavItem"
-              type="button"
-              onClick={() => setActiveScreen("ranking")}
-            >
-              <span aria-hidden="true">👥</span>
-              交流
-            </button>
-          </nav>
+          {questBottomNav}
         </section>
       </main>
     );
@@ -1599,7 +2175,10 @@ export function HomeScreen() {
             <button
               className="timerNavItem"
               type="button"
-              onClick={() => setActiveScreen("quest")}
+              onClick={() => {
+                resetQuestScreen();
+                setActiveScreen("quest");
+              }}
             >
               <span aria-hidden="true">📋</span>
               問題
@@ -2644,6 +3223,7 @@ export function HomeScreen() {
                   }
 
                   if (item.title === "クエスト") {
+                    resetQuestScreen();
                     setActiveScreen("quest");
                   }
                 }}

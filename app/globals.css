@@ -666,7 +666,7 @@ button {
 .questMain {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 12px;
   flex: 1;
   min-height: 0;
   overflow: hidden;
@@ -683,6 +683,7 @@ button {
   border: 1px solid #ffe082;
   padding: 14px 16px;
   background: #fff8e1;
+  flex-shrink: 0;
 }
 
 .questGachaBannerLabel {
@@ -710,6 +711,7 @@ button {
   color: #6e6e73;
   font-size: 12px;
   font-weight: 500;
+  flex-shrink: 0;
 }
 
 .questDailyCard {
@@ -763,6 +765,480 @@ button {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
+}
+
+.questTabBar {
+  box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.questQuestionMain {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 24px 20px 32px;
+  -webkit-overflow-scrolling: touch;
+}
+
+.questQuestionProgress {
+  margin: 0;
+  color: #6e6e73;
+  font-size: 14px;
+  font-weight: 600;
+  text-align: center;
+}
+
+.questSetupMain {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 24px 20px 32px;
+  -webkit-overflow-scrolling: touch;
+}
+
+.questSetupCard {
+  display: grid;
+  gap: 20px;
+  border: 1px solid #e5e5ea;
+  border-radius: 16px;
+  padding: 22px;
+  background: #fff;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+}
+
+.questSetupTitle {
+  margin: 0;
+  color: #1d1d1f;
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.questSetupLead {
+  margin: 0;
+  color: #6e6e73;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.questSetupNote {
+  margin: 0;
+  color: #6e6e73;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.questSetupFieldset {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  border: 0;
+  padding: 0;
+}
+
+.questSetupFieldset legend {
+  margin-bottom: 4px;
+  padding: 0;
+  color: #6e6e73;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.questSetupScrollHint {
+  margin-bottom: 4px;
+}
+
+.questSubcategoryList {
+  display: grid;
+  gap: 8px;
+  max-height: min(280px, 42svh);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-right: 2px;
+  -webkit-overflow-scrolling: touch;
+}
+
+.questSubcategoryOption {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  border: 1px solid #e5e5ea;
+  border-radius: 12px;
+  padding: 12px 14px;
+  background: #f9f9fb;
+  color: #1d1d1f;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.questSubcategoryCount {
+  margin-left: auto;
+  color: #6e6e73;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.questSubcategoryOption:has(input:checked) {
+  border-color: #007aff;
+  background: rgba(0, 122, 255, 0.08);
+  box-shadow: 0 0 0 1px rgba(0, 122, 255, 0.12);
+}
+
+.questSubcategoryOption input {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  accent-color: #007aff;
+}
+
+.questCountTabs {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(72px, 1fr));
+  gap: 8px;
+}
+
+.questCountTab {
+  min-height: 44px;
+  border: 1px solid #e5e5ea;
+  border-radius: 12px;
+  background: #f9f9fb;
+  color: #6e6e73;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.questCountTabActive {
+  border-color: #007aff;
+  background: #007aff;
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(0, 122, 255, 0.22);
+}
+
+.questCountTab:focus-visible {
+  outline: 3px solid rgba(0, 122, 255, 0.22);
+  outline-offset: 2px;
+}
+
+.questNextButton {
+  margin-top: 4px;
+}
+
+.questResultMain {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 24px 20px 32px;
+  -webkit-overflow-scrolling: touch;
+}
+
+.questResultArea {
+  display: grid;
+  gap: 20px;
+}
+
+.questScorePointsRow {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.questScoreCard,
+.questGachaEarnCard {
+  display: grid;
+  gap: 12px;
+  align-content: center;
+  min-height: 200px;
+  border-radius: 16px;
+  padding: 24px 20px;
+}
+
+.questScoreCard {
+  border: 1px solid #e5e5ea;
+  background: #fff;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+}
+
+.questScoreCardLabel {
+  margin: 0;
+  color: #6e6e73;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.questScoreCardValue {
+  margin: 0;
+  color: #1d1d1f;
+  font-size: 36px;
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+.questScoreCardRate {
+  margin: 0;
+  color: #34c759;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.questGachaEarnCard {
+  justify-items: center;
+  text-align: center;
+  border: 1px solid #ffe082;
+  background: #fff8e1;
+}
+
+.questGachaEarnLabel {
+  margin: 0;
+  color: #f57f17;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.questGachaEarnValue {
+  margin: 0;
+  color: #e65100;
+  font-size: 26px;
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+.questStatsRow {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.questStatCorrect,
+.questStatWrong {
+  display: grid;
+  gap: 4px;
+  border-radius: 12px;
+  padding: 16px;
+}
+
+.questStatCorrect {
+  border: 1px solid #c8e6c9;
+  background: #e8f5e9;
+}
+
+.questStatCorrect .questStatLabel {
+  color: #2e7d32;
+}
+
+.questStatCorrect .questStatValue {
+  color: #1b5e20;
+}
+
+.questStatWrong {
+  border: 1px solid #ffcdd2;
+  background: #ffebee;
+}
+
+.questStatWrong .questStatLabel {
+  color: #c62828;
+}
+
+.questStatWrong .questStatValue {
+  color: #b71c1c;
+}
+
+.questStatLabel {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.questStatValue {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+.questResultHint {
+  margin: 0;
+  border-radius: 10px;
+  padding: 12px 14px;
+  background: #f2f2f7;
+  color: #6e6e73;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.questQuestionCard {
+  display: grid;
+  gap: 12px;
+  border: 1px solid #e5e5ea;
+  border-radius: 12px;
+  padding: 20px;
+  background: #fff;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.09);
+}
+
+.questQuestionNumber {
+  margin: 0;
+  color: #1d1d1f;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.questQuestionBody {
+  margin: 0;
+  color: #1d1d1f;
+  font-size: 15px;
+  line-height: 1.55;
+}
+
+.questChoiceList {
+  display: grid;
+  gap: 16px;
+}
+
+.questChoice {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  border: 0;
+  border-radius: 28px;
+  padding: 14px 18px;
+  background: #007aff;
+  color: #fff;
+  text-align: left;
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.questChoice:disabled {
+  cursor: default;
+  opacity: 1;
+}
+
+.questChoiceCorrect {
+  background: #34c759;
+  color: #fff;
+}
+
+.questChoiceCorrect .questChoiceBadge {
+  color: #34c759;
+}
+
+.questChoiceWrong {
+  background: #e53935;
+  color: #fff;
+}
+
+.questChoiceWrong .questChoiceBadge {
+  color: #e53935;
+}
+
+.questChoiceMuted {
+  background: #d1d1d6;
+  color: #3c3c43;
+}
+
+.questChoiceMuted .questChoiceBadge {
+  color: #636366;
+}
+
+.questChoiceBadge {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  place-items: center;
+  border-radius: 14px;
+  background: #fff;
+  color: #007aff;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.questChoiceLabel {
+  flex: 1;
+  line-height: 1.4;
+}
+
+.questResultPanel {
+  display: grid;
+  gap: 14px;
+  justify-items: center;
+  border-radius: 16px;
+  padding: 24px 20px;
+  text-align: center;
+}
+
+.questResultPanelCorrect {
+  border: 2px solid #34c759;
+  background: #e8f5e9;
+}
+
+.questResultPanelWrong {
+  border: 2px solid #e53935;
+  background: #ffebee;
+}
+
+.questResultIcon {
+  display: grid;
+  width: 72px;
+  height: 72px;
+  place-items: center;
+  border-radius: 36px;
+  background: #fff;
+  font-size: 40px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.questResultIconCorrect {
+  border: 3px solid #34c759;
+  color: #34c759;
+}
+
+.questResultIconWrong {
+  border: 3px solid #e53935;
+  color: #e53935;
+}
+
+.questResultPanelCorrect .questResultLabel {
+  color: #1b5e20;
+}
+
+.questResultPanelWrong .questResultLabel {
+  color: #b71c1c;
+}
+
+.questResultLabel {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 700;
+}
+
+.questResultExplanation {
+  margin: 0;
+  width: 100%;
+  color: #1d1d1f;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.55;
+  text-align: left;
+}
+
+.questChoiceSelected {
+  box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.35);
+}
+
+.questChoice:focus-visible {
+  outline: 3px solid rgba(0, 122, 255, 0.35);
+  outline-offset: 2px;
 }
 
 .timerBottomNav {

@@ -6,3 +6,6 @@ export const GACHA_POINTS_PER_STUDY_MINUTE = 1;
 
 /** その日（日本時間）の初回ログイン時に students.gacha_points へ加算する pt */
 export const LOGIN_DAILY_BONUS_PT = 10;
+
+/** クエスト正解1問あたりに students.gacha_points へ加算する pt */
+export const GACHA_POINTS_PER_QUEST_CORRECT = 1;

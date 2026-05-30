@@ -1,0 +1,3 @@
+-- クエスト完了時のガチャポイント付与は award-gacha-points-function.sql の
+-- award_gacha_points(p_gakusei_id, p_amount) を使用します。
+-- 正解1問 = 1pt（GACHA_POINTS_PER_QUEST_CORRECT）を /api/quest-complete から加算します。
