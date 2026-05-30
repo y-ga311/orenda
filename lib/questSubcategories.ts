@@ -226,6 +226,11 @@ export function getQuestQuestionCountHint(
 
   const selectableCounts = getSelectableQuestQuestionCounts(safeAvailable);
   const maxSelectable = selectableCounts[selectableCounts.length - 1] ?? 0;
+
+  if (selectableCounts.length <= 1) {
+    return null;
+  }
+
   const countLabel =
     selectedSubcategoryCount > 1 ? "選択した中分類の登録問題" : "この中分類の登録問題";
 
@@ -256,17 +261,8 @@ export function pickQuestSubcategoryForQuestionIndex(
   return subcategoryIds[questionIndex % subcategoryIds.length] ?? null;
 }
 
-export function formatQuestQuestionCountLabel(
-  count: number,
-  availableCount: number,
-): string {
-  const isFullAvailableCount =
-    count === availableCount &&
-    !questQuestionCountOptions.includes(
-      count as (typeof questQuestionCountOptions)[number],
-    );
-
-  return isFullAvailableCount ? `全${count}問` : `${count}問`;
+export function formatQuestQuestionCountLabel(count: number): string {
+  return `${count}問`;
 }
 
 /** 中分類リストに登録問題数バッジを出すか（5問未満など選択肢が限られる場合） */
@@ -298,4 +294,15 @@ export function getQuestSubcategoryLabel(
     getQuestSubcategories(subjectId).find((item) => item.id === subcategoryId)?.label ??
     "総合"
   );
+}
+
+/** API から取得した中分類リストで、選択中分類の登録問題数合計を返す */
+export function sumQuestSubcategoryQuestionCounts(
+  subcategories: Array<{ id: string; questionCount: number }>,
+  selectedIds: string[],
+): number {
+  return selectedIds.reduce((total, id) => {
+    const match = subcategories.find((item) => item.id === id);
+    return total + (match?.questionCount ?? 0);
+  }, 0);
 }

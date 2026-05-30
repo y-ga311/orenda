@@ -97,20 +97,20 @@ export function getQuestQuestion(context: QuestQuestionContext): QuestQuestion {
   };
 }
 
-/** デイリークエスト用の仮データ */
+/** 教員クエスト用の仮データ */
 export function getDailyQuestQuestion(questionNumber = 1): QuestQuestion {
   return {
     id: questionNumber,
-    body: `デイリークエスト（ランダム10問）の${questionNumber}問目です。次のうち誤っているものを1つ選んでください。`,
+    body: `教員クエスト（ランダム10問）の${questionNumber}問目です。次のうち誤っているものを1つ選んでください。`,
     choices: ["選択肢1", "選択肢2", "選択肢3", "選択肢4"],
     correctIndex: 2,
     explanation:
-      "選択肢3が誤りです。デイリークエストの解説がここに表示されます。",
+      "選択肢3が誤りです。教員クエストの解説がここに表示されます。",
   };
 }
 
 export function isQuestAnswerCorrect(
-  question: QuestQuestion,
+  question: Pick<QuestQuestion, "correctIndex">,
   selectedIndex: number | null,
 ): boolean {
   return selectedIndex !== null && selectedIndex === question.correctIndex;

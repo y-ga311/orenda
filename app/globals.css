@@ -767,6 +767,88 @@ button {
   gap: 12px;
 }
 
+.questBookCard {
+  cursor: pointer;
+}
+
+.questBookCoverWrap {
+  position: relative;
+}
+
+.questBookCardUnavailable {
+  cursor: not-allowed;
+  opacity: 0.72;
+  background: #f2f2f7;
+  border-color: #d1d1d6;
+  color: #8e8e93;
+}
+
+.questBookCardUnavailable:disabled {
+  pointer-events: none;
+}
+
+.questBookCoverUnavailable {
+  filter: grayscale(1);
+  opacity: 0.55;
+}
+
+.questUnavailableBadge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  border-radius: 999px;
+  padding: 4px 8px;
+  background: rgba(60, 60, 67, 0.72);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.questUnavailableHint {
+  color: #8e8e93;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.questShelfLoadingNote {
+  margin: 0 0 4px;
+  text-align: center;
+}
+
+.questSetupUnavailableNote {
+  color: #8e8e93;
+  font-weight: 600;
+}
+
+.questSubcategoryOptionUnavailable {
+  cursor: not-allowed;
+  border-color: #e5e5ea;
+  background: #f2f2f7;
+  color: #8e8e93;
+  opacity: 0.85;
+}
+
+.questSubcategoryOptionUnavailable:has(input:checked) {
+  border-color: #d1d1d6;
+  background: #f2f2f7;
+  box-shadow: none;
+}
+
+.questSubcategoryOptionUnavailable input {
+  cursor: not-allowed;
+}
+
+.questSubcategoryUnavailable {
+  margin-left: auto;
+  border-radius: 999px;
+  padding: 2px 8px;
+  background: #e5e5ea;
+  color: #6e6e73;
+  font-size: 11px;
+  font-weight: 700;
+}
+
 .questTabBar {
   box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.08);
 }
@@ -904,19 +986,19 @@ button {
 
 .questCountTab {
   min-height: 44px;
-  border: 1px solid #e5e5ea;
-  border-radius: 12px;
-  background: #f9f9fb;
-  color: #6e6e73;
-  font-size: 15px;
-  font-weight: 700;
+  border: 1px solid #d1d1d6;
+  border-radius: 10px;
+  background: #fff;
+  color: #1d1d1f;
+  font-size: 14px;
+  font-weight: 600;
 }
 
 .questCountTabActive {
   border-color: #007aff;
-  background: #007aff;
-  color: #fff;
-  box-shadow: 0 2px 8px rgba(0, 122, 255, 0.22);
+  background: #eef5ff;
+  color: #007aff;
+  box-shadow: inset 0 0 0 1px #007aff;
 }
 
 .questCountTab:focus-visible {
@@ -925,7 +1007,18 @@ button {
 }
 
 .questNextButton {
-  margin-top: 4px;
+  min-height: 46px;
+  margin-top: 0;
+  padding: 12px 20px;
+  font-size: 15px;
+}
+
+.questQuestionMain:has(.questResultPanel) {
+  gap: 12px;
+}
+
+.questQuestionMain:has(.questResultPanel) .questChoiceList {
+  gap: 10px;
 }
 
 .questResultMain {
@@ -1169,42 +1262,47 @@ button {
 
 .questResultPanel {
   display: grid;
-  gap: 14px;
-  justify-items: center;
-  border-radius: 16px;
-  padding: 24px 20px;
-  text-align: center;
+  gap: 10px;
+  border-radius: 12px;
+  padding: 12px 14px;
 }
 
 .questResultPanelCorrect {
-  border: 2px solid #34c759;
-  background: #e8f5e9;
+  border: 1px solid #34c759;
+  background: #eef8f0;
 }
 
 .questResultPanelWrong {
-  border: 2px solid #e53935;
-  background: #ffebee;
+  border: 1px solid #e53935;
+  background: #fff3f3;
+}
+
+.questResultHeader {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
 .questResultIcon {
   display: grid;
-  width: 72px;
-  height: 72px;
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
   place-items: center;
-  border-radius: 36px;
+  border-radius: 16px;
   background: #fff;
-  font-size: 40px;
+  font-size: 18px;
   font-weight: 700;
   line-height: 1;
 }
 
 .questResultIconCorrect {
-  border: 3px solid #34c759;
+  border: 2px solid #34c759;
   color: #34c759;
 }
 
 .questResultIconWrong {
-  border: 3px solid #e53935;
+  border: 2px solid #e53935;
   color: #e53935;
 }
 
@@ -1218,18 +1316,17 @@ button {
 
 .questResultLabel {
   margin: 0;
-  font-size: 24px;
+  font-size: 16px;
   font-weight: 700;
+  line-height: 1.2;
 }
 
 .questResultExplanation {
   margin: 0;
-  width: 100%;
   color: #1d1d1f;
   font-size: 14px;
   font-weight: 500;
   line-height: 1.55;
-  text-align: left;
 }
 
 .questChoiceSelected {
