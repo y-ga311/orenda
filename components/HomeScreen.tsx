@@ -73,6 +73,8 @@ import {
 } from "@/lib/questSubcategories";
 import { getStudyType, studyTypes } from "@/lib/studyTypes";
 import { parseStudyTypeId, type StudyTypeId } from "@/lib/studyTypeIds";
+import { TimerBottomNav } from "@/components/TimerBottomNav";
+import { useBottomNavVisibility } from "@/lib/useBottomNavVisibility";
 
 const menuItems = [
   {
@@ -578,6 +580,14 @@ export function HomeScreen() {
   const [gachaVideoKey, setGachaVideoKey] = useState(0);
   const gachaVideoEndedRef = useRef(false);
   const gachaVideoRef = useRef<HTMLVideoElement | null>(null);
+  const bottomNavResetKey =
+    activeScreen === "quest"
+      ? `quest-${questView}`
+      : activeScreen === "gacha" && isGachaPlaying
+        ? "gacha-video"
+        : activeScreen;
+  const { visible: bottomNavVisible, bindScrollRef: bindBottomNavScrollRef } =
+    useBottomNavVisibility(bottomNavResetKey);
   const [studySummary, setStudySummary] = useState<StudySummary>({
     todayMinutes: 0,
     monthMinutes: 0,
@@ -1085,6 +1095,27 @@ export function HomeScreen() {
     setQuestSetupMessage("");
     setIsQuestReviewStarting(false);
   }
+
+  const navigateToTimer = useCallback(() => {
+    setActiveScreen("timer");
+  }, []);
+
+  const navigateToQuest = useCallback(() => {
+    resetQuestScreen();
+    setActiveScreen("quest");
+  }, []);
+
+  const navigateToRecord = useCallback(() => {
+    setActiveScreen("record");
+  }, []);
+
+  const navigateToCollection = useCallback(() => {
+    setActiveScreen("collection");
+  }, []);
+
+  const navigateToRanking = useCallback(() => {
+    setActiveScreen("ranking");
+  }, []);
 
   async function openQuestSetup(subject: StudySubject) {
     setSelectedQuestSubject(subject);
@@ -1886,59 +1917,6 @@ export function HomeScreen() {
       questShelfRows.push(studySubjects.slice(i, i + 2));
     }
 
-    const questBottomNav = (
-      <nav className="timerBottomNav questTabBar" aria-label="下部ナビゲーション">
-        <button
-          className="timerNavItem"
-          type="button"
-          onClick={() => {
-            resetQuestScreen();
-            setActiveScreen("timer");
-          }}
-        >
-          <span aria-hidden="true">⏱</span>
-          タイマー
-        </button>
-        <button className="timerNavItem timerNavItemActive" type="button">
-          <span aria-hidden="true">📋</span>
-          問題
-        </button>
-        <button
-          className="timerNavItem"
-          type="button"
-          onClick={() => {
-            resetQuestScreen();
-            setActiveScreen("record");
-          }}
-        >
-          <span aria-hidden="true">⌛</span>
-          タイム
-        </button>
-        <button
-          className="timerNavItem"
-          type="button"
-          onClick={() => {
-            resetQuestScreen();
-            setActiveScreen("collection");
-          }}
-        >
-          <span aria-hidden="true">▣</span>
-          カード
-        </button>
-        <button
-          className="timerNavItem"
-          type="button"
-          onClick={() => {
-            resetQuestScreen();
-            setActiveScreen("ranking");
-          }}
-        >
-          <span aria-hidden="true">👥</span>
-          交流
-        </button>
-      </nav>
-    );
-
     if (
       questView === "question" &&
       (selectedQuestSubject || isDailyQuest || isReviewQuest)
@@ -2417,6 +2395,7 @@ export function HomeScreen() {
             </p>
 
             <div
+              ref={bindBottomNavScrollRef}
               aria-busy={isQuestSubjectCountsLoading || isQuestReviewCountLoading}
               className={
                 isQuestSubjectCountsLoading || isQuestReviewCountLoading
@@ -2565,7 +2544,16 @@ export function HomeScreen() {
             </div>
           </div>
 
-          {questBottomNav}
+          <TimerBottomNav
+            activeTab="quest"
+            className="questTabBar"
+            visible={bottomNavVisible}
+            onSelectTimer={navigateToTimer}
+            onSelectQuest={navigateToQuest}
+            onSelectRecord={navigateToRecord}
+            onSelectCollection={navigateToCollection}
+            onSelectRanking={navigateToRanking}
+          />
         </section>
       </main>
     );
@@ -2592,7 +2580,7 @@ export function HomeScreen() {
             <span className="timerHeaderBalance" aria-hidden="true" />
           </header>
 
-          <div className="timerContent">
+          <div ref={bindBottomNavScrollRef} className="timerContent">
             <section className="timerSummary" aria-label="学習時間サマリー">
               <div>
                 <span>今日</span>
@@ -2642,47 +2630,15 @@ export function HomeScreen() {
             </section>
           </div>
 
-          <nav className="timerBottomNav" aria-label="下部ナビゲーション">
-            <button className="timerNavItem timerNavItemActive" type="button">
-              <span aria-hidden="true">⏱</span>
-              タイマー
-            </button>
-            <button
-              className="timerNavItem"
-              type="button"
-              onClick={() => {
-                resetQuestScreen();
-                setActiveScreen("quest");
-              }}
-            >
-              <span aria-hidden="true">📋</span>
-              問題
-            </button>
-            <button
-              className="timerNavItem"
-              type="button"
-              onClick={() => setActiveScreen("record")}
-            >
-              <span aria-hidden="true">⌛</span>
-              タイム
-            </button>
-            <button
-              className="timerNavItem"
-              type="button"
-              onClick={() => setActiveScreen("collection")}
-            >
-              <span aria-hidden="true">▣</span>
-              カード
-            </button>
-            <button
-              className="timerNavItem"
-              type="button"
-              onClick={() => setActiveScreen("ranking")}
-            >
-              <span aria-hidden="true">👥</span>
-              交流
-            </button>
-          </nav>
+          <TimerBottomNav
+            activeTab="timer"
+            visible={bottomNavVisible}
+            onSelectTimer={navigateToTimer}
+            onSelectQuest={navigateToQuest}
+            onSelectRecord={navigateToRecord}
+            onSelectCollection={navigateToCollection}
+            onSelectRanking={navigateToRanking}
+          />
         </section>
       </main>
     );
@@ -2828,7 +2784,7 @@ export function HomeScreen() {
             <span className="timerHeaderBalance" aria-hidden="true" />
           </header>
 
-          <div className="recordContent">
+          <div ref={bindBottomNavScrollRef} className="recordContent">
             <section className="recordCard" aria-label="期間別の学習時間">
               <h3>{selectedPeriodOption.title}</h3>
               <div className="recordPeriodTabs" aria-label="表示する期間">
@@ -2963,40 +2919,15 @@ export function HomeScreen() {
             </section>
           </div>
 
-          <nav className="timerBottomNav" aria-label="下部ナビゲーション">
-            <button
-              className="timerNavItem"
-              type="button"
-              onClick={() => setActiveScreen("timer")}
-            >
-              <span aria-hidden="true">⏱</span>
-              タイマー
-            </button>
-            <button className="timerNavItem" type="button">
-              <span aria-hidden="true">📋</span>
-              問題
-            </button>
-            <button className="timerNavItem timerNavItemActive" type="button">
-              <span aria-hidden="true">⌛</span>
-              タイム
-            </button>
-            <button
-              className="timerNavItem"
-              type="button"
-              onClick={() => setActiveScreen("collection")}
-            >
-              <span aria-hidden="true">▣</span>
-              カード
-            </button>
-            <button
-              className="timerNavItem"
-              type="button"
-              onClick={() => setActiveScreen("ranking")}
-            >
-              <span aria-hidden="true">👥</span>
-              交流
-            </button>
-          </nav>
+          <TimerBottomNav
+            activeTab="record"
+            visible={bottomNavVisible}
+            onSelectTimer={navigateToTimer}
+            onSelectQuest={navigateToQuest}
+            onSelectRecord={navigateToRecord}
+            onSelectCollection={navigateToCollection}
+            onSelectRanking={navigateToRanking}
+          />
         </section>
       </main>
     );
@@ -3031,7 +2962,7 @@ export function HomeScreen() {
             <span className="timerHeaderBalance" aria-hidden="true" />
           </header>
 
-          <div className="rankingContent">
+          <div ref={bindBottomNavScrollRef} className="rankingContent">
             <section className="rankingIntroCard">
               <h2>{selectedRankingOption.title}</h2>
               <p>
@@ -3146,40 +3077,15 @@ export function HomeScreen() {
             </section>
           </div>
 
-          <nav className="timerBottomNav" aria-label="下部ナビゲーション">
-            <button
-              className="timerNavItem"
-              type="button"
-              onClick={() => setActiveScreen("timer")}
-            >
-              <span aria-hidden="true">⏱</span>
-              タイマー
-            </button>
-            <button className="timerNavItem" type="button">
-              <span aria-hidden="true">📋</span>
-              問題
-            </button>
-            <button
-              className="timerNavItem"
-              type="button"
-              onClick={() => setActiveScreen("record")}
-            >
-              <span aria-hidden="true">⌛</span>
-              タイム
-            </button>
-            <button
-              className="timerNavItem"
-              type="button"
-              onClick={() => setActiveScreen("collection")}
-            >
-              <span aria-hidden="true">▣</span>
-              カード
-            </button>
-            <button className="timerNavItem timerNavItemActive" type="button">
-              <span aria-hidden="true">👥</span>
-              交流
-            </button>
-          </nav>
+          <TimerBottomNav
+            activeTab="ranking"
+            visible={bottomNavVisible}
+            onSelectTimer={navigateToTimer}
+            onSelectQuest={navigateToQuest}
+            onSelectRecord={navigateToRecord}
+            onSelectCollection={navigateToCollection}
+            onSelectRanking={navigateToRanking}
+          />
         </section>
       </main>
     );
@@ -3211,7 +3117,7 @@ export function HomeScreen() {
             </header>
           ) : null}
 
-          <div className="gachaContent">
+          <div ref={bindBottomNavScrollRef} className="gachaContent">
             {isGachaPlaying ? (
               <div className="gachaVideoStage" aria-live="polite">
                 <video
@@ -3320,44 +3226,15 @@ export function HomeScreen() {
           </div>
 
           {!isGachaPlaying ? (
-            <nav className="timerBottomNav" aria-label="下部ナビゲーション">
-              <button
-                className="timerNavItem"
-                type="button"
-                onClick={() => setActiveScreen("timer")}
-              >
-                <span aria-hidden="true">⏱</span>
-                タイマー
-              </button>
-              <button className="timerNavItem" type="button">
-                <span aria-hidden="true">📋</span>
-                問題
-              </button>
-              <button
-                className="timerNavItem"
-                type="button"
-                onClick={() => setActiveScreen("record")}
-              >
-                <span aria-hidden="true">⌛</span>
-                タイム
-              </button>
-              <button
-                className="timerNavItem timerNavItemActive"
-                type="button"
-                onClick={() => setActiveScreen("collection")}
-              >
-                <span aria-hidden="true">▣</span>
-                カード
-              </button>
-              <button
-                className="timerNavItem"
-                type="button"
-                onClick={() => setActiveScreen("ranking")}
-              >
-                <span aria-hidden="true">👥</span>
-                交流
-              </button>
-            </nav>
+            <TimerBottomNav
+              activeTab="collection"
+              visible={bottomNavVisible}
+              onSelectTimer={navigateToTimer}
+              onSelectQuest={navigateToQuest}
+              onSelectRecord={navigateToRecord}
+              onSelectCollection={navigateToCollection}
+              onSelectRanking={navigateToRanking}
+            />
           ) : null}
         </section>
       </main>
@@ -3426,7 +3303,7 @@ export function HomeScreen() {
                 </div>
               </div>
 
-              <div className="medalBadgeScroll">
+              <div ref={bindBottomNavScrollRef} className="medalBadgeScroll">
                 <div className="medalBadgeGrid" role="list" aria-label="達成メダル一覧">
                   {Array.from({ length: medalRows }, (_, rowIndex) => (
                     <div className="medalGridRow" key={rowIndex}>
@@ -3465,40 +3342,15 @@ export function HomeScreen() {
             </section>
           </div>
 
-          <nav className="timerBottomNav" aria-label="下部ナビゲーション">
-            <button
-              className="timerNavItem"
-              type="button"
-              onClick={() => setActiveScreen("timer")}
-            >
-              <span aria-hidden="true">⏱</span>
-              タイマー
-            </button>
-            <button className="timerNavItem" type="button">
-              <span aria-hidden="true">📋</span>
-              問題
-            </button>
-            <button
-              className="timerNavItem"
-              type="button"
-              onClick={() => setActiveScreen("record")}
-            >
-              <span aria-hidden="true">⌛</span>
-              タイム
-            </button>
-            <button className="timerNavItem timerNavItemActive" type="button">
-              <span aria-hidden="true">▣</span>
-              カード
-            </button>
-            <button
-              className="timerNavItem"
-              type="button"
-              onClick={() => setActiveScreen("ranking")}
-            >
-              <span aria-hidden="true">👥</span>
-              交流
-            </button>
-          </nav>
+          <TimerBottomNav
+            activeTab="collection"
+            visible={bottomNavVisible}
+            onSelectTimer={navigateToTimer}
+            onSelectQuest={navigateToQuest}
+            onSelectRecord={navigateToRecord}
+            onSelectCollection={navigateToCollection}
+            onSelectRanking={navigateToRanking}
+          />
         </section>
       </main>
     );
@@ -3569,7 +3421,11 @@ export function HomeScreen() {
                 <small>{collectionCards.length}/99</small>
               </div>
 
-              <section className="collectionGrid" aria-label="カード一覧">
+              <section
+                ref={bindBottomNavScrollRef}
+                className="collectionGrid"
+                aria-label="カード一覧"
+              >
                 {cardSlots.map((card) => (
                   card.image ? (
                     <button
@@ -3599,40 +3455,15 @@ export function HomeScreen() {
             </section>
           </div>
 
-          <nav className="timerBottomNav" aria-label="下部ナビゲーション">
-            <button
-              className="timerNavItem"
-              type="button"
-              onClick={() => setActiveScreen("timer")}
-            >
-              <span aria-hidden="true">⏱</span>
-              タイマー
-            </button>
-            <button className="timerNavItem" type="button">
-              <span aria-hidden="true">📋</span>
-              問題
-            </button>
-            <button
-              className="timerNavItem"
-              type="button"
-              onClick={() => setActiveScreen("record")}
-            >
-              <span aria-hidden="true">⌛</span>
-              タイム
-            </button>
-            <button className="timerNavItem timerNavItemActive" type="button">
-              <span aria-hidden="true">▣</span>
-              カード
-            </button>
-            <button
-              className="timerNavItem"
-              type="button"
-              onClick={() => setActiveScreen("ranking")}
-            >
-              <span aria-hidden="true">👥</span>
-              交流
-            </button>
-          </nav>
+          <TimerBottomNav
+            activeTab="collection"
+            visible={bottomNavVisible}
+            onSelectTimer={navigateToTimer}
+            onSelectQuest={navigateToQuest}
+            onSelectRecord={navigateToRecord}
+            onSelectCollection={navigateToCollection}
+            onSelectRanking={navigateToRanking}
+          />
 
           {selectedCollectionCard ? (
             <div
