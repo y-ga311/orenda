@@ -35,6 +35,20 @@ import tougaiImage from "@/source-images/tougai.png";
 import tougaiCardImage from "@/source-images/tougai_card.png";
 import tourinImage from "@/source-images/tourin.png";
 import tourinCardImage from "@/source-images/tourin_card.png";
+import medal001G from "@/source-images/medal/001G.png";
+import medal002G from "@/source-images/medal/002G.png";
+import medal003G from "@/source-images/medal/003G.png";
+import medal004G from "@/source-images/medal/004G.png";
+import medal005G from "@/source-images/medal/005G.png";
+import medal006G from "@/source-images/medal/006G.png";
+import medal007G from "@/source-images/medal/007G.png";
+import medal008G from "@/source-images/medal/008G.png";
+import medal009G from "@/source-images/medal/009G.png";
+import medal010G from "@/source-images/medal/010G.png";
+import medal011G from "@/source-images/medal/011G.png";
+import medal012G from "@/source-images/medal/012G.png";
+import medal006S from "@/source-images/medal/006S.png";
+import medal010C from "@/source-images/medal/010C.png";
 import { avatarIcons, getAvatarIcon, type AvatarIconId } from "@/lib/avatarIcons";
 import { GACHA_SPIN_COST_PT } from "@/lib/gachaConstants";
 import { normalizeGachaPoints } from "@/lib/normalizeGachaPoints";
@@ -173,25 +187,64 @@ const collectionCards = [
   { title: "関係法規", image: kankeihoukiCardImage },
 ];
 
+type MedalTier = "G" | "S" | "C";
+
 type AchievementMedalEntry = {
   id: string;
   title: string;
   image: StaticImageData;
+  medalNo: string;
+  tier: MedalTier;
   unlocked: boolean;
 };
 
+const medalImageMap: Record<string, StaticImageData> = {
+  "001G": medal001G,
+  "002G": medal002G,
+  "003G": medal003G,
+  "004G": medal004G,
+  "005G": medal005G,
+  "006G": medal006G,
+  "007G": medal007G,
+  "008G": medal008G,
+  "009G": medal009G,
+  "010G": medal010G,
+  "011G": medal011G,
+  "012G": medal012G,
+  "006S": medal006S,
+  "010C": medal010C,
+};
+
+function getMedalImage(medalNo: string, tier: MedalTier) {
+  return medalImageMap[`${medalNo}${tier}`] ?? medalImageMap[`${medalNo}G`];
+}
+
+const achievementMedalDefs = [
+  { id: "career-nav", title: "キャリアnavi", medalNo: "001", tier: "G", unlocked: true },
+  { id: "company-session", title: "企業説明会", medalNo: "002", tier: "G", unlocked: true },
+  { id: "ankoku", title: "暗刻", medalNo: "003", tier: "G", unlocked: false },
+  { id: "mogusa-factory", title: "もぐさ工場見学", medalNo: "004", tier: "G", unlocked: false },
+  { id: "career-nav2", title: "キャリアnavi2", medalNo: "005", tier: "G", unlocked: false },
+  { id: "anmame", title: "暗豆", medalNo: "006", tier: "S", unlocked: true },
+  { id: "job-session", title: "就職説明会", medalNo: "007", tier: "G", unlocked: false },
+  { id: "anki", title: "暗爺", medalNo: "008", tier: "G", unlocked: true },
+  { id: "sports-win", title: "球技大会優勝", medalNo: "006", tier: "S", unlocked: true },
+  { id: "attendance-95", title: "出席率95%以上", medalNo: "010", tier: "C", unlocked: true },
+  { id: "mock-exam-1st", title: "模擬試験1位", medalNo: "011", tier: "G", unlocked: false },
+  { id: "regular-exam-1st", title: "定期試験1位", medalNo: "010", tier: "C", unlocked: true },
+] as const satisfies ReadonlyArray<{
+  id: string;
+  title: string;
+  medalNo: string;
+  tier: MedalTier;
+  unlocked: boolean;
+}>;
+
 /** Pencil メダル画面（達成一覧）準拠のプレビューデータ */
-const achievementMedals: AchievementMedalEntry[] = [
-  { id: "career-nav", title: "キャリアnavi", image: kaibouImage, unlocked: true },
-  { id: "company-session", title: "企業説明会", image: seiriImage, unlocked: true },
-  { id: "school-fest", title: "学園祭", image: byouriImage, unlocked: false },
-  { id: "mock1", title: "第１回模試", image: souronImage, unlocked: true },
-  { id: "anki-sem1", title: "暗爺(１学期)", image: kakuronImage, unlocked: true },
-  { id: "anki-sem2", title: "暗爺(２学期)", image: rehaImage, unlocked: true },
-  { id: "anki-sem3", title: "暗爺(３学期)", image: tourinImage, unlocked: true },
-  { id: "anmame-sem1", title: "暗豆(1学期)", image: keiketuImage, unlocked: true },
-  { id: "anmame-sem2", title: "暗豆(２学期)", image: characterImage, unlocked: true },
-];
+const achievementMedals: AchievementMedalEntry[] = achievementMedalDefs.map((medal) => ({
+  ...medal,
+  image: getMedalImage(medal.medalNo, medal.tier),
+}));
 
 type StudySubject = (typeof studySubjects)[number];
 
@@ -3391,7 +3444,7 @@ export function HomeScreen() {
                                   alt=""
                                   className="medalBadgeThumb"
                                   fill
-                                  sizes="(max-width: 430px) 28vw, 104px"
+                                  sizes="(max-width: 430px) 31vw, 116px"
                                 />
                               </div>
                             </div>
