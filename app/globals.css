@@ -1222,6 +1222,14 @@ button {
   font-weight: 700;
 }
 
+.questQuestionNationalExamSource {
+  margin: 0;
+  color: #636366;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
 .questQuestionBody {
   margin: 0;
   color: #1d1d1f;

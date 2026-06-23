@@ -186,6 +186,8 @@ function mapReviewItemToQuestionRow(row: QuestReviewItemRow): QuestQuestionDbRow
     correct_index: row.correct_index,
     explanation: row.explanation,
     sort_order: row.sort_order ?? 0,
+    national_exam_round: row.national_exam_round ?? null,
+    national_exam_question_no: row.national_exam_question_no ?? null,
   };
 }
 
@@ -216,7 +218,7 @@ export async function fetchQuestReviewSessionQuestions(
   const { data, error } = await supabase
     .from("quest_review_items")
     .select(
-      "question_id, subject_id, subcategory_id, body, choice_1, choice_2, choice_3, choice_4, correct_index, explanation, answered_at",
+      "question_id, subject_id, subcategory_id, body, choice_1, choice_2, choice_3, choice_4, correct_index, explanation, national_exam_round, national_exam_question_no, answered_at",
     )
     .eq("gakusei_id", gakuseiId)
     .order("answered_at", { ascending: false });
@@ -253,7 +255,7 @@ export async function fetchQuestSessionQuestions(
   const { data, error } = await supabase
     .from("quest_questions")
     .select(
-      "id, subject_id, subcategory_id, body, choice_1, choice_2, choice_3, choice_4, correct_index, explanation, sort_order",
+      "id, subject_id, subcategory_id, body, choice_1, choice_2, choice_3, choice_4, correct_index, explanation, sort_order, national_exam_round, national_exam_question_no",
     )
     .eq("subject_id", subjectId)
     .in("subcategory_id", subcategoryIds)

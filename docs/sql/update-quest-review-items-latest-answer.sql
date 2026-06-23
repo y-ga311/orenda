@@ -46,6 +46,8 @@ SELECT
   q.choice_4,
   q.correct_index,
   q.explanation,
+  q.national_exam_round,
+  q.national_exam_question_no,
   lw.selected_index,
   lw.answered_at
 FROM latest_wrong lw

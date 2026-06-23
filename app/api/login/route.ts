@@ -4,6 +4,7 @@ import { getJapanDateParts } from "@/lib/japanDate";
 import { normalizeGachaPoints } from "@/lib/normalizeGachaPoints";
 import { parseStudyTypeId } from "@/lib/studyTypeIds";
 import { processStudentLogin } from "@/lib/processStudentLogin";
+import { decryptStudentName } from "@/lib/studentNameCrypto.server";
 
 export const runtime = "nodejs";
 
@@ -141,7 +142,7 @@ export async function POST(request: Request) {
   const response = NextResponse.json({
     student: {
       gakuseiId: data.gakusei_id,
-      name: data.name,
+      name: await decryptStudentName(data.name),
       className,
       nickname: data.nickname,
       avatarIconId: data.avatar_icon_id,

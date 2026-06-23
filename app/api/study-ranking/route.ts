@@ -12,6 +12,7 @@ import {
   type RankingPeriod,
 } from "@/lib/studyRankingPeriod";
 import { createServiceRoleSupabaseClient } from "@/lib/supabaseServiceRole";
+import { decryptStudentRows } from "@/lib/studentNameCrypto.server";
 
 export const runtime = "nodejs";
 
@@ -176,7 +177,10 @@ export async function GET(request: Request) {
   }
 
   const studentById = new Map(
-    ((students ?? []) as Student[]).map((student) => [student.gakusei_id, student]),
+    (await decryptStudentRows((students ?? []) as Student[])).map((student) => [
+      student.gakusei_id,
+      student,
+    ]),
   );
   const rankByStudentId = new Map(
     rankedStudentIds.map((studentId, index) => [studentId, index + 1]),

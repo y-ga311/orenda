@@ -56,10 +56,11 @@ import {
   getDailyQuestQuestion,
   isQuestAnswerCorrect,
 } from "@/lib/questQuestions";
-import type {
-  QuestAnswerLogEntry,
-  QuestSessionQuestion,
-  QuestSubcategoryRow,
+import {
+  formatNationalExamSource,
+  type QuestAnswerLogEntry,
+  type QuestSessionQuestion,
+  type QuestSubcategoryRow,
 } from "@/lib/questDbTypes";
 import {
   formatQuestQuestionCountLabel,
@@ -1967,6 +1968,12 @@ export function HomeScreen() {
         isDailyQuest && dailyQuest
           ? dailyQuest.id
           : sessionQuest?.displayNumber ?? questionNumber;
+      const nationalExamSource = sessionQuest
+        ? formatNationalExamSource(
+            sessionQuest.nationalExamRound,
+            sessionQuest.nationalExamQuestionNo,
+          )
+        : null;
       const isCorrect = isQuestAnswerCorrect(currentQuest, selectedQuestChoice);
       const isLastQuestion = questionNumber >= selectedQuestQuestionCount;
 
@@ -2005,6 +2012,9 @@ export function HomeScreen() {
                 <p className="questQuestionNumber" id="quest-question-label">
                   問{displayQuestionNumber}
                 </p>
+                {nationalExamSource ? (
+                  <p className="questQuestionNationalExamSource">{nationalExamSource}</p>
+                ) : null}
                 <p className="questQuestionBody">{currentQuest.body}</p>
               </article>
 

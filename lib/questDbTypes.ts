@@ -13,6 +13,8 @@ export type QuestSessionQuestion = {
   choices: [string, string, string, string];
   correctIndex: number;
   explanation: string;
+  nationalExamRound: number | null;
+  nationalExamQuestionNo: number | null;
 };
 
 export type QuestAnswerLogEntry = {
@@ -34,7 +36,20 @@ export type QuestQuestionDbRow = {
   correct_index: number;
   explanation: string;
   sort_order: number;
+  national_exam_round: number | null;
+  national_exam_question_no: number | null;
 };
+
+export function formatNationalExamSource(
+  round: number | null | undefined,
+  questionNo: number | null | undefined,
+): string | null {
+  if (round == null || questionNo == null) {
+    return null;
+  }
+
+  return `第${round}回 ${questionNo}問目`;
+}
 
 export function mapQuestQuestionRow(
   row: QuestQuestionDbRow,
@@ -48,5 +63,7 @@ export function mapQuestQuestionRow(
     choices: [row.choice_1, row.choice_2, row.choice_3, row.choice_4],
     correctIndex: row.correct_index,
     explanation: row.explanation,
+    nationalExamRound: row.national_exam_round,
+    nationalExamQuestionNo: row.national_exam_question_no,
   };
 }

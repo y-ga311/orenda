@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { isAvatarIconId } from "@/lib/avatarIconIds";
 import { normalizeGachaPoints } from "@/lib/normalizeGachaPoints";
 import { parseStudyTypeId } from "@/lib/studyTypeIds";
+import { decryptStudentName } from "@/lib/studentNameCrypto.server";
 
 export const runtime = "nodejs";
 
@@ -79,7 +80,7 @@ export async function POST(request: Request) {
 
   return NextResponse.json({
     student: {
-      name: data.name,
+      name: await decryptStudentName(data.name),
       nickname: data.nickname,
       avatarIconId: data.avatar_icon_id,
       studyTypeId: parseStudyTypeId(
