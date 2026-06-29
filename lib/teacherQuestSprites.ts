@@ -80,14 +80,29 @@ export function getTeacherQuestSprite(teacherName: string | null | undefined): S
 export function getTeacherQuestIntroMessage(
   questionIndex: number,
   questionCount: number,
+  teacherName: string,
 ): string {
   if (questionIndex === 0) {
-    return "問題が出題されるぞ！";
+    const displayName = formatTeacherDisplayName(teacherName);
+    return `${displayName}がしょうぶをいどんできた！`;
   }
 
   return `問${questionIndex + 1}／${questionCount}。次の問題だ！`;
 }
 
+function formatTeacherDisplayName(teacherName: string): string {
+  const trimmed = teacherName.normalize("NFKC").trim();
+  if (!trimmed) {
+    return "先生";
+  }
+
+  if (trimmed.endsWith("先生")) {
+    return trimmed;
+  }
+
+  return `${trimmed}先生`;
+}
+
 export function getTeacherQuestFeedbackMessage(isCorrect: boolean): string {
-  return isCorrect ? "正解だ！よくできた！" : "残念！不正解だ…";
+  return isCorrect ? "正解！よくできた！" : "残念！不正解…";
 }

@@ -50,7 +50,7 @@ import medal012G from "@/source-images/medal/012G.png";
 import medal006S from "@/source-images/medal/006S.png";
 import medal010C from "@/source-images/medal/010C.png";
 import { avatarIcons, getAvatarIcon, type AvatarIconId } from "@/lib/avatarIcons";
-import { GACHA_SPIN_COST_PT } from "@/lib/gachaConstants";
+import { GACHA_POINTS_PER_TEACHER_QUEST_CORRECT, GACHA_SPIN_COST_PT } from "@/lib/gachaConstants";
 import { normalizeGachaPoints } from "@/lib/normalizeGachaPoints";
 import {
   isQuestAnswerCorrect,
@@ -557,8 +557,10 @@ export function HomeScreen() {
   const [isTeacherQuestLoading, setIsTeacherQuestLoading] = useState(false);
   const [isTeacherQuestStarting, setIsTeacherQuestStarting] = useState(false);
   const [teacherQuestPhase, setTeacherQuestPhase] =
-    useState<TeacherQuestPhase>("intro");
+    useState<TeacherQuestPhase>("encounter");
   const [isQuestReviewStarting, setIsQuestReviewStarting] = useState(false);
+  const [questSelectDataVersion, setQuestSelectDataVersion] = useState(0);
+  const questSelectDataRequestRef = useRef(0);
   const [message, setMessage] = useState("");
   const [loginSuccessNotice, setLoginSuccessNotice] = useState<{
     dailyBonusAwarded: boolean;
@@ -694,35 +696,28 @@ export function HomeScreen() {
     };
   }, [activeScreen, isLoggedInPreview]);
 
-  useEffect(() => {
-    if (!isLoggedInPreview || activeScreen !== "quest" || questView !== "select") {
-      return;
-    }
+  const loadQuestSelectData = useCallback(async () => {
+    const requestId = questSelectDataRequestRef.current + 1;
+    questSelectDataRequestRef.current = requestId;
 
-    let isMounted = true;
+    setIsQuestSubjectCountsLoading(true);
+    setIsQuestReviewCountLoading(true);
+    setIsTeacherQuestLoading(true);
 
-    async function loadQuestSelectData() {
-      setIsQuestSubjectCountsLoading(true);
-      setIsQuestReviewCountLoading(true);
-      setIsTeacherQuestLoading(true);
-
+    try {
       const subjectIds = studySubjects.map((subject) => subject.id).join(",");
       const [subjectCountsResponse, reviewCountResponse, teacherQuestResponse] =
         await Promise.all([
-        fetch(
-          `/api/quest-subject-counts?subjectIds=${encodeURIComponent(subjectIds)}`,
-        ).catch(() => null),
-        fetch("/api/quest-review").catch(() => null),
-        fetch("/api/teacher-quest").catch(() => null),
-      ]);
+          fetch(
+            `/api/quest-subject-counts?subjectIds=${encodeURIComponent(subjectIds)}`,
+          ).catch(() => null),
+          fetch("/api/quest-review").catch(() => null),
+          fetch("/api/teacher-quest").catch(() => null),
+        ]);
 
-      if (!isMounted) {
+      if (questSelectDataRequestRef.current !== requestId) {
         return;
       }
-
-      setIsQuestSubjectCountsLoading(false);
-      setIsQuestReviewCountLoading(false);
-      setIsTeacherQuestLoading(false);
 
       if (subjectCountsResponse?.ok) {
         const result = (await subjectCountsResponse.json().catch(() => null)) as {
@@ -761,14 +756,22 @@ export function HomeScreen() {
         setTeacherQuestQuestionCount(0);
         setTeacherQuestMeta(null);
       }
+    } finally {
+      if (questSelectDataRequestRef.current === requestId) {
+        setIsQuestSubjectCountsLoading(false);
+        setIsQuestReviewCountLoading(false);
+        setIsTeacherQuestLoading(false);
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!isLoggedInPreview || activeScreen !== "quest") {
+      return;
     }
 
     void loadQuestSelectData();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [activeScreen, isLoggedInPreview, questView]);
+  }, [activeScreen, isLoggedInPreview, loadQuestSelectData, questSelectDataVersion]);
 
   useEffect(() => {
     if (!isLoggedInPreview || activeScreen !== "record") {
@@ -1119,7 +1122,7 @@ export function HomeScreen() {
     setTeacherQuestId(null);
     setIsTeacherQuestLoading(false);
     setIsTeacherQuestStarting(false);
-    setTeacherQuestPhase("intro");
+    setTeacherQuestPhase("encounter");
   }
 
   function resetQuestScreen() {
@@ -1144,7 +1147,13 @@ export function HomeScreen() {
     setIsQuestReviewStarting(false);
     setTeacherQuestId(null);
     setTeacherQuestMeta(null);
-    setTeacherQuestPhase("intro");
+    setTeacherQuestPhase("encounter");
+    setQuestSelectDataVersion((current) => current + 1);
+  }
+
+  function returnToQuestSelect() {
+    setQuestView("select");
+    setQuestSelectDataVersion((current) => current + 1);
   }
 
   const navigateToTimer = useCallback(() => {
@@ -1337,7 +1346,7 @@ export function HomeScreen() {
       setIsQuestStarting(false);
       setQuestSetupMessage("");
       setQuestView("question");
-      setTeacherQuestPhase("intro");
+      setTeacherQuestPhase("encounter");
 
       return { ok: true };
     });
@@ -1350,45 +1359,47 @@ export function HomeScreen() {
 
     setIsQuestReviewStarting(true);
 
-    const response = await fetch("/api/quest-review", {
-      method: "POST",
-    }).catch(() => null);
+    try {
+      const response = await fetch("/api/quest-review", {
+        method: "POST",
+      }).catch(() => null);
 
-    setIsQuestReviewStarting(false);
+      if (!response?.ok) {
+        return;
+      }
 
-    if (!response?.ok) {
-      return;
+      const result = (await response.json().catch(() => null)) as {
+        questions?: QuestSessionQuestion[];
+        questionCount?: number;
+      } | null;
+      const questions = result?.questions ?? [];
+
+      if (questions.length === 0) {
+        setQuestReviewQuestionCount(0);
+        return;
+      }
+
+      setSelectedQuestSubject(null);
+      setIsTeacherQuest(false);
+      setIsReviewQuest(true);
+      setSelectedQuestSubcategoryIds([]);
+      setQuestSessionQuestions(questions);
+      setSelectedQuestQuestionCount(result?.questionCount ?? questions.length);
+      setQuestQuestionIndex(0);
+      setSelectedQuestChoice(null);
+      setQuestAnswerSubmitted(false);
+      setQuestCorrectCount(0);
+      setQuestAnswerLog([]);
+      setIsQuestCompleting(false);
+      setQuestCompleteMessage("");
+      setQuestSetupSubcategories([]);
+      setIsQuestSetupLoading(false);
+      setIsQuestStarting(false);
+      setQuestSetupMessage("");
+      setQuestView("question");
+    } finally {
+      setIsQuestReviewStarting(false);
     }
-
-    const result = (await response.json().catch(() => null)) as {
-      questions?: QuestSessionQuestion[];
-      questionCount?: number;
-    } | null;
-    const questions = result?.questions ?? [];
-
-    if (questions.length === 0) {
-      setQuestReviewQuestionCount(0);
-      return;
-    }
-
-    setSelectedQuestSubject(null);
-    setIsTeacherQuest(false);
-    setIsReviewQuest(true);
-    setSelectedQuestSubcategoryIds([]);
-    setQuestSessionQuestions(questions);
-    setSelectedQuestQuestionCount(result?.questionCount ?? questions.length);
-    setQuestQuestionIndex(0);
-    setSelectedQuestChoice(null);
-    setQuestAnswerSubmitted(false);
-    setQuestCorrectCount(0);
-    setQuestAnswerLog([]);
-    setIsQuestCompleting(false);
-    setQuestCompleteMessage("");
-    setQuestSetupSubcategories([]);
-    setIsQuestSetupLoading(false);
-    setIsQuestStarting(false);
-    setQuestSetupMessage("");
-    setQuestView("question");
   }
 
   async function completeQuestAndShowResult() {
@@ -2042,9 +2053,12 @@ export function HomeScreen() {
                   className="timerBackButton"
                   type="button"
                   onClick={() => {
-                    setQuestView(
-                      isTeacherQuest || isReviewQuest ? "select" : "setup",
-                    );
+                    if (isTeacherQuest || isReviewQuest) {
+                      returnToQuestSelect();
+                      return;
+                    }
+
+                    setQuestView("setup");
                   }}
                 >
                   <span aria-hidden="true">‹</span>
@@ -2077,8 +2091,12 @@ export function HomeScreen() {
         function handleTeacherQuestBack() {
           setSelectedQuestChoice(null);
           setQuestAnswerSubmitted(false);
-          setTeacherQuestPhase("intro");
-          setQuestView("select");
+          setTeacherQuestPhase("encounter");
+          setIsTeacherQuest(false);
+          setTeacherQuestId(null);
+          setTeacherQuestMeta(null);
+          setQuestSessionQuestions([]);
+          returnToQuestSelect();
         }
 
         function handleTeacherQuestSelectChoice(index: number) {
@@ -2127,8 +2145,10 @@ export function HomeScreen() {
               questionCount={selectedQuestQuestionCount}
               questionIndex={questQuestionIndex}
               selectedChoice={selectedQuestChoice}
+              teacherName={teacherQuestMeta.teacherName}
               teacherSprite={getTeacherQuestSprite(teacherQuestMeta.teacherName)}
               onBack={handleTeacherQuestBack}
+              onEncounterComplete={() => setTeacherQuestPhase("intro")}
               onFeedbackContinue={handleTeacherQuestFeedbackContinue}
               onIntroContinue={() => setTeacherQuestPhase("choice")}
               onSelectChoice={handleTeacherQuestSelectChoice}
@@ -2151,9 +2171,12 @@ export function HomeScreen() {
                 onClick={() => {
                   setSelectedQuestChoice(null);
                   setQuestAnswerSubmitted(false);
-                    setQuestView(
-                      isTeacherQuest || isReviewQuest ? "select" : "setup",
-                    );
+                  if (isTeacherQuest || isReviewQuest) {
+                    returnToQuestSelect();
+                    return;
+                  }
+
+                  setQuestView("setup");
                 }}
               >
                 <span aria-hidden="true">‹</span>
@@ -2289,6 +2312,9 @@ export function HomeScreen() {
         selectedQuestQuestionCount > 0
           ? Math.round((questCorrectCount / selectedQuestQuestionCount) * 100)
           : 0;
+      const questPointsEarned = isTeacherQuest
+        ? questCorrectCount * GACHA_POINTS_PER_TEACHER_QUEST_CORRECT
+        : questCorrectCount;
 
       return (
         <main className="appShell">
@@ -2323,7 +2349,7 @@ export function HomeScreen() {
 
                   <article className="questGachaEarnCard">
                     <p className="questGachaEarnLabel">カードガチャ</p>
-                    <p className="questGachaEarnValue">+{questCorrectCount} pt</p>
+                    <p className="questGachaEarnValue">+{questPointsEarned} pt</p>
                   </article>
                 </div>
 
@@ -2338,16 +2364,18 @@ export function HomeScreen() {
                   </article>
                 </div>
 
-                <p className="questResultHint">
-                  間違えた問題は復習リストから再度確認できます。
-                </p>
+                {!isTeacherQuest ? (
+                  <p className="questResultHint">
+                    間違えた問題は復習リストから再度確認できます。
+                  </p>
+                ) : null}
 
                 <button
                   className="profileSubmitButton"
                   type="button"
                   onClick={resetQuestScreen}
                 >
-                  科目一覧に戻る
+                  {isTeacherQuest ? "クエスト一覧に戻る" : "科目一覧に戻る"}
                 </button>
               </section>
             </div>
@@ -2665,11 +2693,7 @@ export function HomeScreen() {
                           ? "subjectCard questBookCard questBookCardUnavailable questSpecialCard"
                           : "subjectCard questBookCard questSpecialCard"
                       }
-                      disabled={
-                        isReviewUnavailable ||
-                        isQuestReviewStarting ||
-                        isQuestReviewCountLoading
-                      }
+                      disabled={isReviewUnavailable}
                       type="button"
                       aria-label={
                         isReviewUnavailable

@@ -3073,6 +3073,16 @@ button {
   right: -6%;
   width: 56.2%;
   height: 34.7%;
+  will-change: transform, opacity;
+}
+
+.teacherQuestTeacherSpriteEntering {
+  animation: teacherQuestTeacherEnter 560ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+.teacherQuestTeacherSpriteEntered {
+  transform: translateX(0);
+  opacity: 1;
 }
 
 .teacherQuestTeacherImage {
@@ -3086,6 +3096,41 @@ button {
   top: 25.5%;
   width: 72.8%;
   height: 44.8%;
+  will-change: transform, opacity;
+}
+
+.teacherQuestPlayerSpriteEntering {
+  animation: teacherQuestPlayerEnter 560ms cubic-bezier(0.22, 1, 0.36, 1) 100ms
+    forwards;
+}
+
+.teacherQuestPlayerSpriteEntered {
+  transform: translateX(0);
+  opacity: 1;
+}
+
+@keyframes teacherQuestTeacherEnter {
+  from {
+    transform: translateX(calc(100% + 56px));
+    opacity: 0.7;
+  }
+
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes teacherQuestPlayerEnter {
+  from {
+    transform: translateX(calc(-100% - 56px));
+    opacity: 0.7;
+  }
+
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
 }
 
 .teacherQuestPlayerImage {
@@ -3113,6 +3158,52 @@ button {
   padding: 14px 16px 42px;
   background: #f8f8f8;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+}
+
+.teacherQuestDialoguePanel:disabled {
+  cursor: default;
+  opacity: 1;
+}
+
+.teacherQuestDialoguePanelEntering {
+  animation: teacherQuestDialogueEnter 360ms ease-out forwards;
+}
+
+@keyframes teacherQuestDialogueEnter {
+  from {
+    transform: translateY(28px);
+    opacity: 0;
+  }
+
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .teacherQuestTeacherSpriteEntering,
+  .teacherQuestPlayerSpriteEntering,
+  .teacherQuestDialoguePanelEntering {
+    animation: none;
+  }
+
+  .teacherQuestTeacherSpriteEntering,
+  .teacherQuestTeacherSpriteEntered,
+  .teacherQuestPlayerSpriteEntering,
+  .teacherQuestPlayerSpriteEntered {
+    transform: translateX(0);
+    opacity: 1;
+  }
+
+  .teacherQuestDialoguePanelEntering {
+    transform: translateY(0);
+    opacity: 1;
+  }
 }
 
 .teacherQuestSpeakerPlate {
@@ -3152,22 +3243,22 @@ button {
   color: #c62828;
 }
 
-.teacherQuestContinueButton {
+.teacherQuestContinueHint {
   position: absolute;
   right: 16px;
   bottom: 12px;
-  border: 0;
   min-width: 44px;
   min-height: 44px;
   padding: 8px;
-  background: transparent;
   color: #3a3a3a;
   font-family: "Press Start 2P", cursive;
   font-size: 10px;
-  line-height: 1;
+  line-height: 44px;
+  text-align: center;
+  pointer-events: none;
 }
 
-.teacherQuestContinueButton:disabled {
+.teacherQuestDialoguePanel:disabled .teacherQuestContinueHint {
   opacity: 0.45;
 }
 
@@ -3286,6 +3377,16 @@ button {
   z-index: 10000;
   pointer-events: all;
   touch-action: none;
+  background: #000;
+}
+
+.teacherQuestBattleTransition[data-phase="closing"] {
+  background: #fff;
+}
+
+.teacherQuestBattleTransition[data-phase="blackout"],
+.teacherQuestBattleTransition[data-phase="opening"] {
+  background: #000;
 }
 
 .teacherQuestBattleTransitionCanvas {

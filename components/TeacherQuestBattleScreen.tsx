@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import Image, { type StaticImageData } from "next/image";
 import teacherQuestBackground from "@/source-images/teachar_quest/000background.png";
 import playerCharaImage from "@/source-images/teachar_quest/00chara.png";
@@ -12,9 +13,12 @@ import {
   getTeacherQuestIntroMessage,
 } from "@/lib/teacherQuestSprites";
 
-export type TeacherQuestPhase = "intro" | "choice" | "feedback";
+export type TeacherQuestPhase = "encounter" | "intro" | "choice" | "feedback";
+
+const ENCOUNTER_ANIMATION_MS = 620;
 
 type TeacherQuestBattleScreenProps = {
+  teacherName: string;
   teacherSprite: StaticImageData;
   phase: TeacherQuestPhase;
   question: QuestSessionQuestion;
@@ -26,6 +30,7 @@ type TeacherQuestBattleScreenProps = {
   isLastQuestion: boolean;
   completeMessage: string;
   onBack: () => void;
+  onEncounterComplete: () => void;
   onIntroContinue: () => void;
   onSelectChoice: (index: number) => void;
   onFeedbackContinue: () => void;
@@ -55,6 +60,7 @@ function getTeacherChoiceClassName(
 }
 
 export function TeacherQuestBattleScreen({
+  teacherName,
   teacherSprite,
   phase,
   question,
@@ -66,6 +72,7 @@ export function TeacherQuestBattleScreen({
   isLastQuestion,
   completeMessage,
   onBack,
+  onEncounterComplete,
   onIntroContinue,
   onSelectChoice,
   onFeedbackContinue,
@@ -76,11 +83,44 @@ export function TeacherQuestBattleScreen({
   );
   const isCorrect =
     selectedChoice !== null && selectedChoice === question.correctIndex;
-  const introMessage = getTeacherQuestIntroMessage(questionIndex, questionCount);
+  const introMessage = getTeacherQuestIntroMessage(
+    questionIndex,
+    questionCount,
+    teacherName,
+  );
   const feedbackHeadline =
     selectedChoice !== null
       ? getTeacherQuestFeedbackMessage(isCorrect)
       : "";
+  const isEncounterPhase = phase === "encounter";
+  const showSprites =
+    phase === "encounter" ||
+    phase === "intro" ||
+    phase === "choice" ||
+    phase === "feedback";
+
+  useEffect(() => {
+    if (phase !== "encounter") {
+      return;
+    }
+
+    const prefersReducedMotion = window.matchMedia(
+      "(prefers-reduced-motion: reduce)",
+    ).matches;
+
+    if (prefersReducedMotion) {
+      onEncounterComplete();
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      onEncounterComplete();
+    }, ENCOUNTER_ANIMATION_MS);
+
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [onEncounterComplete, phase, questionIndex]);
 
   return (
     <section className="phoneFrame teacherQuestScreen" aria-label="教員クエスト">
@@ -105,7 +145,15 @@ export function TeacherQuestBattleScreen({
           />
         </div>
 
-        <div className="teacherQuestTeacherSprite">
+        <div
+          className={
+            isEncounterPhase
+              ? "teacherQuestTeacherSprite teacherQuestTeacherSpriteEntering"
+              : showSprites
+                ? "teacherQuestTeacherSprite teacherQuestTeacherSpriteEntered"
+                : "teacherQuestTeacherSprite"
+          }
+        >
           <Image
             alt=""
             className="teacherQuestTeacherImage"
@@ -117,7 +165,15 @@ export function TeacherQuestBattleScreen({
           />
         </div>
 
-        <div className="teacherQuestPlayerSprite">
+        <div
+          className={
+            isEncounterPhase
+              ? "teacherQuestPlayerSprite teacherQuestPlayerSpriteEntering"
+              : showSprites
+                ? "teacherQuestPlayerSprite teacherQuestPlayerSpriteEntered"
+                : "teacherQuestPlayerSprite"
+          }
+        >
           <Image
             alt=""
             className="teacherQuestPlayerImage"
@@ -130,17 +186,17 @@ export function TeacherQuestBattleScreen({
       </div>
 
       {phase === "intro" ? (
-        <div className="teacherQuestDialoguePanel">
+        <button
+          className="teacherQuestDialoguePanel teacherQuestDialoguePanelEntering"
+          type="button"
+          onClick={onIntroContinue}
+          aria-label="次へ"
+        >
           <p className="teacherQuestDialogueText">{introMessage}</p>
-          <button
-            className="teacherQuestContinueButton"
-            type="button"
-            onClick={onIntroContinue}
-            aria-label="次へ"
-          >
+          <span className="teacherQuestContinueHint" aria-hidden="true">
             ▼
-          </button>
-        </div>
+          </span>
+        </button>
       ) : null}
 
       {phase === "choice" ? (
@@ -183,7 +239,13 @@ export function TeacherQuestBattleScreen({
       ) : null}
 
       {phase === "feedback" && selectedChoice !== null ? (
-        <div className="teacherQuestDialoguePanel">
+        <button
+          className="teacherQuestDialoguePanel teacherQuestDialoguePanelEntering"
+          type="button"
+          disabled={isCompleting}
+          onClick={onFeedbackContinue}
+          aria-label={isLastQuestion ? "結果を見る" : "次の問題へ"}
+        >
           <p
             className={
               isCorrect
@@ -194,21 +256,15 @@ export function TeacherQuestBattleScreen({
             {feedbackHeadline}
           </p>
           <p className="teacherQuestDialogueText">{question.explanation}</p>
-          <button
-            className="teacherQuestContinueButton"
-            type="button"
-            disabled={isCompleting}
-            onClick={onFeedbackContinue}
-            aria-label={isLastQuestion ? "結果を見る" : "次の問題へ"}
-          >
+          <span className="teacherQuestContinueHint" aria-hidden="true">
             {isCompleting ? "…" : "▼"}
-          </button>
+          </span>
           {completeMessage ? (
             <p className="teacherQuestCompleteMessage" role="alert">
               {completeMessage}
             </p>
           ) : null}
-        </div>
+        </button>
       ) : null}
     </section>
   );

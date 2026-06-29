@@ -1,7 +1,7 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { awardStudentGachaPoints } from "@/lib/awardStudentGachaPoints";
-import { GACHA_POINTS_PER_QUEST_CORRECT } from "@/lib/gachaConstants";
+import { GACHA_POINTS_PER_QUEST_CORRECT, GACHA_POINTS_PER_TEACHER_QUEST_CORRECT } from "@/lib/gachaConstants";
 import { countQuestQuestionsForSubcategories } from "@/lib/questDb";
 import type { QuestAnswerLogEntry } from "@/lib/questDbTypes";
 import {
@@ -224,7 +224,11 @@ export async function POST(request: Request) {
     }
   }
 
-  const pointsEarned = correctCount * GACHA_POINTS_PER_QUEST_CORRECT;
+  const pointsPerCorrect =
+    questScope === "teacher"
+      ? GACHA_POINTS_PER_TEACHER_QUEST_CORRECT
+      : GACHA_POINTS_PER_QUEST_CORRECT;
+  const pointsEarned = correctCount * pointsPerCorrect;
   const result = await awardStudentGachaPoints(supabase, studentId, pointsEarned);
 
   if (!result.ok) {

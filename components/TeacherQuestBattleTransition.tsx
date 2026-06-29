@@ -5,6 +5,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
   type ReactNode,
@@ -24,34 +25,56 @@ type TeacherQuestBattleTransitionProps = {
   onOpeningComplete: () => void;
 };
 
-const SPIRAL_MS = 720;
+const TRANSITION_MS = 680;
 const BLACKOUT_HOLD_MS = 220;
-const TOTAL_DOTS = 420;
-const SPIRAL_TURNS = 9;
+const BAR_COUNT = 10;
+const BAR_STAGGER = 0.42;
+const FLASH_PORTION = 0.14;
+
+function clamp(value: number, min: number, max: number) {
+  return Math.min(Math.max(value, min), max);
+}
 
 function easeInOutCubic(t: number) {
   return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
 }
 
-function getDotLayout(width: number, height: number, rotation = 0) {
-  const centerX = width / 2;
-  const centerY = height / 2;
-  const maxRadius = Math.hypot(width, height) * 0.58;
-  const dotRadius = Math.max(5, Math.min(width, height) / 34);
+function easeOutCubic(t: number) {
+  return 1 - Math.pow(1 - t, 3);
+}
 
-  const dots = Array.from({ length: TOTAL_DOTS }, (_, index) => {
-    const t = index / (TOTAL_DOTS - 1);
-    const angle = t * SPIRAL_TURNS * Math.PI * 2 + rotation;
-    const radius = t * maxRadius;
+function drawSolidWhite(
+  context: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+) {
+  context.clearRect(0, 0, width, height);
+  context.fillStyle = "#fff";
+  context.fillRect(0, 0, width, height);
+}
 
-    return {
-      x: centerX + Math.cos(angle) * radius,
-      y: centerY + Math.sin(angle) * radius,
-      radius: dotRadius * (0.92 + (index % 3) * 0.04),
-    };
+function setupCanvas(canvas: HTMLCanvasElement) {
+  const context = canvas.getContext("2d");
+  if (!context) {
+    return null;
+  }
+
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = Math.floor(window.innerWidth * dpr);
+  canvas.height = Math.floor(window.innerHeight * dpr);
+  canvas.style.width = `${window.innerWidth}px`;
+  canvas.style.height = `${window.innerHeight}px`;
+  context.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+  return context;
+}
+
+function waitForNextPaint() {
+  return new Promise<void>((resolve) => {
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => resolve());
+    });
   });
-
-  return dots;
 }
 
 function drawSolidBlack(
@@ -64,7 +87,7 @@ function drawSolidBlack(
   context.fillRect(0, 0, width, height);
 }
 
-function drawSpiralFrame(
+function drawBattleBarFrame(
   context: CanvasRenderingContext2D,
   width: number,
   height: number,
@@ -73,32 +96,51 @@ function drawSpiralFrame(
 ) {
   context.clearRect(0, 0, width, height);
 
-  const eased = easeInOutCubic(Math.min(Math.max(progress, 0), 1));
-  const rotation = eased * Math.PI * 1.25;
-  const dots = getDotLayout(width, height, rotation);
-  const threshold = eased * TOTAL_DOTS;
+  const barHeight = height / BAR_COUNT + 1;
+
+  if (phase === "closing" && progress < FLASH_PORTION) {
+    const flashProgress = progress / FLASH_PORTION;
+    const flashStrength = 1 - easeOutCubic(flashProgress);
+    context.fillStyle = `rgba(255, 255, 255, ${flashStrength})`;
+    context.fillRect(0, 0, width, height);
+    return;
+  }
+
+  const barProgress =
+    phase === "closing"
+      ? clamp((progress - FLASH_PORTION) / (1 - FLASH_PORTION), 0, 1)
+      : clamp(progress, 0, 1);
+  const eased = easeInOutCubic(barProgress);
 
   context.fillStyle = "#000";
 
-  for (let index = 0; index < dots.length; index += 1) {
-    const dot = dots[index];
-    const isVisible =
-      phase === "closing" ? index <= threshold : index >= threshold;
+  for (let index = 0; index < BAR_COUNT; index += 1) {
+    const y = index * (height / BAR_COUNT);
+    const delay = (index / BAR_COUNT) * BAR_STAGGER;
+    const stripProgress = clamp((eased - delay) / (1 - BAR_STAGGER), 0, 1);
+    const travel = easeOutCubic(stripProgress);
 
-    if (!isVisible) {
+    if (phase === "closing") {
+      if (index % 2 === 0) {
+        context.fillRect(-width + travel * width, y, width, barHeight);
+      } else {
+        context.fillRect(width - travel * width, y, width, barHeight);
+      }
       continue;
     }
 
-    context.beginPath();
-    context.arc(dot.x, dot.y, dot.radius, 0, Math.PI * 2);
-    context.fill();
+    if (index % 2 === 0) {
+      context.fillRect(-travel * width, y, width, barHeight);
+    } else {
+      context.fillRect(travel * width, y, width, barHeight);
+    }
   }
 
-  if (phase === "closing" && eased >= 0.92) {
+  if (phase === "closing" && eased >= 0.98) {
     context.fillRect(0, 0, width, height);
   }
 
-  if (phase === "opening" && eased <= 0.04) {
+  if (phase === "opening" && eased <= 0.02) {
     context.fillRect(0, 0, width, height);
   }
 }
@@ -118,7 +160,6 @@ export function TeacherQuestBattleTransition({
     onBlackoutComplete,
     onOpeningComplete,
   });
-  const [isMounted, setIsMounted] = useState(false);
 
   callbacksRef.current = {
     onClosingComplete,
@@ -126,9 +167,28 @@ export function TeacherQuestBattleTransition({
     onOpeningComplete,
   };
 
-  useEffect(() => {
-    setIsMounted(true);
-  }, []);
+  useLayoutEffect(() => {
+    if (phase === "idle") {
+      return;
+    }
+
+    const canvas = canvasRef.current;
+    if (!canvas) {
+      return;
+    }
+
+    const context = setupCanvas(canvas);
+    if (!context) {
+      return;
+    }
+
+    if (phase === "closing") {
+      drawSolidWhite(context, window.innerWidth, window.innerHeight);
+      return;
+    }
+
+    drawSolidBlack(context, window.innerWidth, window.innerHeight);
+  }, [phase]);
 
   useEffect(() => {
     if (phase === "idle") {
@@ -149,7 +209,7 @@ export function TeacherQuestBattleTransition({
       return;
     }
 
-    const context = canvas.getContext("2d");
+    const context = setupCanvas(canvas);
     if (!context) {
       return;
     }
@@ -159,15 +219,19 @@ export function TeacherQuestBattleTransition({
     ).matches;
 
     const resizeCanvas = () => {
-      const dpr = window.devicePixelRatio || 1;
-      canvas.width = Math.floor(window.innerWidth * dpr);
-      canvas.height = Math.floor(window.innerHeight * dpr);
-      canvas.style.width = `${window.innerWidth}px`;
-      canvas.style.height = `${window.innerHeight}px`;
-      context.setTransform(dpr, 0, 0, dpr, 0, 0);
+      const context = setupCanvas(canvas);
+      if (!context) {
+        return;
+      }
+
+      if (phase === "closing") {
+        drawSolidWhite(context, window.innerWidth, window.innerHeight);
+        return;
+      }
+
+      drawSolidBlack(context, window.innerWidth, window.innerHeight);
     };
 
-    resizeCanvas();
     window.addEventListener("resize", resizeCanvas);
 
     if (prefersReducedMotion) {
@@ -205,8 +269,8 @@ export function TeacherQuestBattleTransition({
       }
 
       const elapsed = timestamp - startRef.current;
-      const progress = Math.min(elapsed / SPIRAL_MS, 1);
-      drawSpiralFrame(
+      const progress = Math.min(elapsed / TRANSITION_MS, 1);
+      drawBattleBarFrame(
         context,
         window.innerWidth,
         window.innerHeight,
@@ -219,9 +283,8 @@ export function TeacherQuestBattleTransition({
         return;
       }
 
-      drawSolidBlack(context, window.innerWidth, window.innerHeight);
-
       if (phase === "closing") {
+        drawSolidBlack(context, window.innerWidth, window.innerHeight);
         callbacksRef.current.onClosingComplete();
       } else {
         callbacksRef.current.onOpeningComplete();
@@ -230,6 +293,8 @@ export function TeacherQuestBattleTransition({
 
     if (phase === "opening") {
       drawSolidBlack(context, window.innerWidth, window.innerHeight);
+    } else if (phase === "closing") {
+      drawSolidWhite(context, window.innerWidth, window.innerHeight);
     }
 
     frameRef.current = requestAnimationFrame(animate);
@@ -243,7 +308,7 @@ export function TeacherQuestBattleTransition({
     };
   }, [phase]);
 
-  if (phase === "idle" || !isMounted) {
+  if (phase === "idle") {
     return null;
   }
 
@@ -281,7 +346,13 @@ export function TeacherQuestTransitionProvider({ children }: { children: ReactNo
       return;
     }
 
-    setPhase("opening");
+    void waitForNextPaint().then(() => {
+      if (!fetchDoneRef.current || !blackoutDoneRef.current) {
+        return;
+      }
+
+      setPhase("opening");
+    });
   }, []);
 
   const runTeacherQuestTransition = useCallback(
