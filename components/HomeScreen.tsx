@@ -53,9 +53,9 @@ import { avatarIcons, getAvatarIcon, type AvatarIconId } from "@/lib/avatarIcons
 import { GACHA_SPIN_COST_PT } from "@/lib/gachaConstants";
 import { normalizeGachaPoints } from "@/lib/normalizeGachaPoints";
 import {
-  getDailyQuestQuestion,
   isQuestAnswerCorrect,
 } from "@/lib/questQuestions";
+import type { TeacherQuestSummary } from "@/lib/teacherQuestDb";
 import {
   formatNationalExamSource,
   type QuestAnswerLogEntry,
@@ -75,7 +75,13 @@ import {
 import { getStudyType, studyTypes } from "@/lib/studyTypes";
 import { parseStudyTypeId, type StudyTypeId } from "@/lib/studyTypeIds";
 import { TimerBottomNav } from "@/components/TimerBottomNav";
+import {
+  TeacherQuestBattleScreen,
+  type TeacherQuestPhase,
+} from "@/components/TeacherQuestBattleScreen";
+import { useTeacherQuestTransition } from "@/components/TeacherQuestBattleTransition";
 import { useBottomNavVisibility } from "@/lib/useBottomNavVisibility";
+import { getTeacherQuestSprite } from "@/lib/teacherQuestSprites";
 
 const menuItems = [
   {
@@ -488,6 +494,8 @@ function PasswordVisibilityIcon({ isVisible }: { isVisible: boolean }) {
 }
 
 export function HomeScreen() {
+  const { runTeacherQuestTransition, isTeacherQuestTransitioning } =
+    useTeacherQuestTransition();
   const [recordCalendarMonth, setRecordCalendarMonth] = useState(
     getCurrentJapanYearMonth,
   );
@@ -516,7 +524,7 @@ export function HomeScreen() {
   const [selectedQuestQuestionCount, setSelectedQuestQuestionCount] =
     useState<QuestQuestionCount>(10);
   const [questQuestionIndex, setQuestQuestionIndex] = useState(0);
-  const [isDailyQuest, setIsDailyQuest] = useState(false);
+  const [isTeacherQuest, setIsTeacherQuest] = useState(false);
   const [isReviewQuest, setIsReviewQuest] = useState(false);
   const [selectedQuestChoice, setSelectedQuestChoice] = useState<number | null>(null);
   const [questAnswerSubmitted, setQuestAnswerSubmitted] = useState(false);
@@ -540,6 +548,16 @@ export function HomeScreen() {
     useState(false);
   const [questReviewQuestionCount, setQuestReviewQuestionCount] = useState(0);
   const [isQuestReviewCountLoading, setIsQuestReviewCountLoading] = useState(false);
+  const [teacherQuestAvailable, setTeacherQuestAvailable] = useState(false);
+  const [teacherQuestQuestionCount, setTeacherQuestQuestionCount] = useState(0);
+  const [teacherQuestMeta, setTeacherQuestMeta] = useState<TeacherQuestSummary | null>(
+    null,
+  );
+  const [teacherQuestId, setTeacherQuestId] = useState<string | null>(null);
+  const [isTeacherQuestLoading, setIsTeacherQuestLoading] = useState(false);
+  const [isTeacherQuestStarting, setIsTeacherQuestStarting] = useState(false);
+  const [teacherQuestPhase, setTeacherQuestPhase] =
+    useState<TeacherQuestPhase>("intro");
   const [isQuestReviewStarting, setIsQuestReviewStarting] = useState(false);
   const [message, setMessage] = useState("");
   const [loginSuccessNotice, setLoginSuccessNotice] = useState<{
@@ -686,13 +704,16 @@ export function HomeScreen() {
     async function loadQuestSelectData() {
       setIsQuestSubjectCountsLoading(true);
       setIsQuestReviewCountLoading(true);
+      setIsTeacherQuestLoading(true);
 
       const subjectIds = studySubjects.map((subject) => subject.id).join(",");
-      const [subjectCountsResponse, reviewCountResponse] = await Promise.all([
+      const [subjectCountsResponse, reviewCountResponse, teacherQuestResponse] =
+        await Promise.all([
         fetch(
           `/api/quest-subject-counts?subjectIds=${encodeURIComponent(subjectIds)}`,
         ).catch(() => null),
         fetch("/api/quest-review").catch(() => null),
+        fetch("/api/teacher-quest").catch(() => null),
       ]);
 
       if (!isMounted) {
@@ -701,6 +722,7 @@ export function HomeScreen() {
 
       setIsQuestSubjectCountsLoading(false);
       setIsQuestReviewCountLoading(false);
+      setIsTeacherQuestLoading(false);
 
       if (subjectCountsResponse?.ok) {
         const result = (await subjectCountsResponse.json().catch(() => null)) as {
@@ -720,6 +742,24 @@ export function HomeScreen() {
         setQuestReviewQuestionCount(
           typeof result?.count === "number" ? result.count : 0,
         );
+      }
+
+      if (teacherQuestResponse?.ok) {
+        const result = (await teacherQuestResponse.json().catch(() => null)) as {
+          available?: boolean;
+          questionCount?: number;
+          quest?: TeacherQuestSummary | null;
+        } | null;
+
+        setTeacherQuestAvailable(result?.available === true);
+        setTeacherQuestQuestionCount(
+          typeof result?.questionCount === "number" ? result.questionCount : 0,
+        );
+        setTeacherQuestMeta(result?.quest ?? null);
+      } else {
+        setTeacherQuestAvailable(false);
+        setTeacherQuestQuestionCount(0);
+        setTeacherQuestMeta(null);
       }
     }
 
@@ -1055,7 +1095,7 @@ export function HomeScreen() {
     setSelectedQuestSubcategoryIds([]);
     setSelectedQuestQuestionCount(10);
     setQuestQuestionIndex(0);
-    setIsDailyQuest(false);
+    setIsTeacherQuest(false);
     setSelectedQuestChoice(null);
     setQuestAnswerSubmitted(false);
     setQuestCorrectCount(0);
@@ -1073,6 +1113,13 @@ export function HomeScreen() {
     setIsQuestReviewCountLoading(false);
     setIsReviewQuest(false);
     setIsQuestReviewStarting(false);
+    setTeacherQuestAvailable(false);
+    setTeacherQuestQuestionCount(0);
+    setTeacherQuestMeta(null);
+    setTeacherQuestId(null);
+    setIsTeacherQuestLoading(false);
+    setIsTeacherQuestStarting(false);
+    setTeacherQuestPhase("intro");
   }
 
   function resetQuestScreen() {
@@ -1081,7 +1128,7 @@ export function HomeScreen() {
     setSelectedQuestSubcategoryIds([]);
     setSelectedQuestQuestionCount(10);
     setQuestQuestionIndex(0);
-    setIsDailyQuest(false);
+    setIsTeacherQuest(false);
     setIsReviewQuest(false);
     setSelectedQuestChoice(null);
     setQuestAnswerSubmitted(false);
@@ -1095,6 +1142,9 @@ export function HomeScreen() {
     setIsQuestStarting(false);
     setQuestSetupMessage("");
     setIsQuestReviewStarting(false);
+    setTeacherQuestId(null);
+    setTeacherQuestMeta(null);
+    setTeacherQuestPhase("intro");
   }
 
   const navigateToTimer = useCallback(() => {
@@ -1120,7 +1170,7 @@ export function HomeScreen() {
 
   async function openQuestSetup(subject: StudySubject) {
     setSelectedQuestSubject(subject);
-    setIsDailyQuest(false);
+    setIsTeacherQuest(false);
     setIsReviewQuest(false);
     setSelectedQuestSubcategoryIds([]);
     setSelectedQuestQuestionCount(10);
@@ -1225,30 +1275,72 @@ export function HomeScreen() {
     setQuestView("question");
   }
 
-  function openDailyQuestQuestion() {
-    const pick = studySubjects[Math.floor(Math.random() * studySubjects.length)];
-    if (!pick) {
+  async function openTeacherQuest() {
+    if (
+      isTeacherQuestStarting ||
+      isTeacherQuestTransitioning ||
+      isTeacherQuestLoading ||
+      !teacherQuestAvailable ||
+      teacherQuestQuestionCount === 0
+    ) {
       return;
     }
 
-    setSelectedQuestSubject(pick);
-    setIsDailyQuest(true);
-    setIsReviewQuest(false);
-    setSelectedQuestSubcategoryIds([]);
-    setSelectedQuestQuestionCount(10);
-    setQuestQuestionIndex(0);
-    setSelectedQuestChoice(null);
-    setQuestAnswerSubmitted(false);
-    setQuestCorrectCount(0);
-    setIsQuestCompleting(false);
-    setQuestCompleteMessage("");
-    setQuestSetupSubcategories([]);
-    setQuestSessionQuestions([]);
-    setQuestAnswerLog([]);
-    setIsQuestSetupLoading(false);
-    setIsQuestStarting(false);
-    setQuestSetupMessage("");
-    setQuestView("question");
+    runTeacherQuestTransition(async () => {
+      setIsTeacherQuestStarting(true);
+
+      const response = await fetch("/api/teacher-quest", {
+        method: "POST",
+      }).catch(() => null);
+
+      setIsTeacherQuestStarting(false);
+
+      if (!response?.ok) {
+        setTeacherQuestAvailable(false);
+        setTeacherQuestQuestionCount(0);
+        setTeacherQuestMeta(null);
+        return { ok: false };
+      }
+
+      const result = (await response.json().catch(() => null)) as {
+        quest?: TeacherQuestSummary;
+        questions?: QuestSessionQuestion[];
+        questionCount?: number;
+      } | null;
+      const questions = result?.questions ?? [];
+      const quest = result?.quest ?? null;
+
+      if (questions.length === 0 || !quest) {
+        setTeacherQuestAvailable(false);
+        setTeacherQuestQuestionCount(0);
+        setTeacherQuestMeta(null);
+        return { ok: false };
+      }
+
+      setSelectedQuestSubject(null);
+      setIsTeacherQuest(true);
+      setIsReviewQuest(false);
+      setSelectedQuestSubcategoryIds([]);
+      setQuestSessionQuestions(questions);
+      setTeacherQuestId(quest.id);
+      setTeacherQuestMeta(quest);
+      setSelectedQuestQuestionCount(result?.questionCount ?? questions.length);
+      setQuestQuestionIndex(0);
+      setSelectedQuestChoice(null);
+      setQuestAnswerSubmitted(false);
+      setQuestCorrectCount(0);
+      setQuestAnswerLog([]);
+      setIsQuestCompleting(false);
+      setQuestCompleteMessage("");
+      setQuestSetupSubcategories([]);
+      setIsQuestSetupLoading(false);
+      setIsQuestStarting(false);
+      setQuestSetupMessage("");
+      setQuestView("question");
+      setTeacherQuestPhase("intro");
+
+      return { ok: true };
+    });
   }
 
   async function openReviewQuest() {
@@ -1280,7 +1372,7 @@ export function HomeScreen() {
     }
 
     setSelectedQuestSubject(null);
-    setIsDailyQuest(false);
+    setIsTeacherQuest(false);
     setIsReviewQuest(true);
     setSelectedQuestSubcategoryIds([]);
     setQuestSessionQuestions(questions);
@@ -1315,9 +1407,12 @@ export function HomeScreen() {
       body: JSON.stringify({
         correctCount: questCorrectCount,
         questionCount: selectedQuestQuestionCount,
-        questScope: isDailyQuest ? "teacher" : isReviewQuest ? "review" : "subject",
-        ...(isDailyQuest
-          ? {}
+        questScope: isTeacherQuest ? "teacher" : isReviewQuest ? "review" : "subject",
+        ...(isTeacherQuest
+          ? {
+              teacherQuestId,
+              answers: questAnswerLog,
+            }
           : isReviewQuest
             ? { answers: questAnswerLog }
             : !selectedQuestSubject || selectedQuestSubcategoryIds.length === 0
@@ -1362,6 +1457,9 @@ export function HomeScreen() {
     setQuestQuestionIndex((current) => current + 1);
     setSelectedQuestChoice(null);
     setQuestAnswerSubmitted(false);
+    if (isTeacherQuest) {
+      setTeacherQuestPhase("intro");
+    }
   }
 
   function getQuestChoiceClassName(
@@ -1920,15 +2018,16 @@ export function HomeScreen() {
 
     if (
       questView === "question" &&
-      (selectedQuestSubject || isDailyQuest || isReviewQuest)
+      (selectedQuestSubject || isTeacherQuest || isReviewQuest)
     ) {
       const questionNumber = questQuestionIndex + 1;
-      const dailyQuest = isDailyQuest ? getDailyQuestQuestion(questionNumber) : null;
       const sessionQuest = questSessionQuestions[questQuestionIndex] ?? null;
-      const currentQuest = isDailyQuest ? dailyQuest : sessionQuest;
+      const currentQuest = sessionQuest;
       const questChoiceKeyPrefix = isReviewQuest
         ? "review"
-        : selectedQuestSubject?.id ?? "quest";
+        : isTeacherQuest
+          ? "teacher"
+          : selectedQuestSubject?.id ?? "quest";
 
       if (!currentQuest) {
         return (
@@ -1944,7 +2043,7 @@ export function HomeScreen() {
                   type="button"
                   onClick={() => {
                     setQuestView(
-                      isDailyQuest || isReviewQuest ? "select" : "setup",
+                      isTeacherQuest || isReviewQuest ? "select" : "setup",
                     );
                   }}
                 >
@@ -1964,10 +2063,7 @@ export function HomeScreen() {
         );
       }
 
-      const displayQuestionNumber =
-        isDailyQuest && dailyQuest
-          ? dailyQuest.id
-          : sessionQuest?.displayNumber ?? questionNumber;
+      const displayQuestionNumber = sessionQuest?.displayNumber ?? questionNumber;
       const nationalExamSource = sessionQuest
         ? formatNationalExamSource(
             sessionQuest.nationalExamRound,
@@ -1976,6 +2072,70 @@ export function HomeScreen() {
         : null;
       const isCorrect = isQuestAnswerCorrect(currentQuest, selectedQuestChoice);
       const isLastQuestion = questionNumber >= selectedQuestQuestionCount;
+
+      if (isTeacherQuest && teacherQuestMeta) {
+        function handleTeacherQuestBack() {
+          setSelectedQuestChoice(null);
+          setQuestAnswerSubmitted(false);
+          setTeacherQuestPhase("intro");
+          setQuestView("select");
+        }
+
+        function handleTeacherQuestSelectChoice(index: number) {
+          if (questAnswerSubmitted || teacherQuestPhase !== "choice") {
+            return;
+          }
+
+          setSelectedQuestChoice(index);
+          setQuestAnswerSubmitted(true);
+          const answeredCorrectly = index === currentQuest.correctIndex;
+          if (answeredCorrectly) {
+            setQuestCorrectCount((current) => current + 1);
+          }
+          if (sessionQuest) {
+            setQuestAnswerLog((current) => [
+              ...current,
+              {
+                questionId: sessionQuest.questionId,
+                questionNumber,
+                selectedIndex: index,
+                isCorrect: answeredCorrectly,
+              },
+            ]);
+          }
+          setTeacherQuestPhase("feedback");
+        }
+
+        function handleTeacherQuestFeedbackContinue() {
+          if (isLastQuestion) {
+            void completeQuestAndShowResult();
+            return;
+          }
+
+          goToNextQuestQuestion();
+        }
+
+        return (
+          <main className="appShell">
+            <TeacherQuestBattleScreen
+              answerSubmitted={questAnswerSubmitted}
+              completeMessage={questCompleteMessage}
+              isCompleting={isQuestCompleting}
+              isLastQuestion={isLastQuestion}
+              phase={teacherQuestPhase}
+              question={currentQuest}
+              questionCount={selectedQuestQuestionCount}
+              questionIndex={questQuestionIndex}
+              selectedChoice={selectedQuestChoice}
+              teacherSprite={getTeacherQuestSprite(teacherQuestMeta.teacherName)}
+              onBack={handleTeacherQuestBack}
+              onFeedbackContinue={handleTeacherQuestFeedbackContinue}
+              onIntroContinue={() => setTeacherQuestPhase("choice")}
+              onSelectChoice={handleTeacherQuestSelectChoice}
+            />
+          </main>
+        );
+      }
 
       return (
         <main className="appShell">
@@ -1992,19 +2152,25 @@ export function HomeScreen() {
                   setSelectedQuestChoice(null);
                   setQuestAnswerSubmitted(false);
                     setQuestView(
-                      isDailyQuest || isReviewQuest ? "select" : "setup",
+                      isTeacherQuest || isReviewQuest ? "select" : "setup",
                     );
                 }}
               >
                 <span aria-hidden="true">‹</span>
                 戻る
               </button>
-              <h1>クエスト</h1>
+              <h1>{isTeacherQuest && teacherQuestMeta ? teacherQuestMeta.title : "クエスト"}</h1>
               <span className="timerHeaderBalance" aria-hidden="true" />
             </header>
 
             <div className="questQuestionMain">
               <p className="questQuestionProgress" aria-live="polite">
+                {isTeacherQuest && teacherQuestMeta ? (
+                  <>
+                    {teacherQuestMeta.teacherName}
+                    <br />
+                  </>
+                ) : null}
                 問{questionNumber}/{selectedQuestQuestionCount}
               </p>
 
@@ -2042,7 +2208,7 @@ export function HomeScreen() {
                       if (answeredCorrectly) {
                         setQuestCorrectCount((current) => current + 1);
                       }
-                      if (!isDailyQuest && sessionQuest) {
+                      if (sessionQuest) {
                         setQuestAnswerLog((current) => [
                           ...current,
                           {
@@ -2406,38 +2572,87 @@ export function HomeScreen() {
 
             <div
               ref={bindBottomNavScrollRef}
-              aria-busy={isQuestSubjectCountsLoading || isQuestReviewCountLoading}
+              aria-busy={
+                isQuestSubjectCountsLoading ||
+                isQuestReviewCountLoading ||
+                isTeacherQuestLoading
+              }
               className={
-                isQuestSubjectCountsLoading || isQuestReviewCountLoading
+                isQuestSubjectCountsLoading ||
+                isQuestReviewCountLoading ||
+                isTeacherQuestLoading
                   ? "questShelf questShelfLoading"
                   : "questShelf"
               }
               aria-label="クエスト一覧"
             >
-              {isQuestSubjectCountsLoading || isQuestReviewCountLoading ? (
+              {isQuestSubjectCountsLoading ||
+              isQuestReviewCountLoading ||
+              isTeacherQuestLoading ? (
                 <p className="questSetupNote questShelfLoadingNote">
                   クエスト情報を読み込んでいます...
                 </p>
               ) : null}
 
               <div className="questBookRow">
-                <button
-                  className="subjectCard questBookCard questSpecialCard"
-                  type="button"
-                  onClick={openDailyQuestQuestion}
-                >
-                  <div className="questBookCoverWrap questTeacherCoverWrap">
-                    <Image
-                      src={characterImage}
-                      alt=""
-                      className="questTeacherCover"
-                      priority
-                    />
-                  </div>
-                  <div className="questBookCardMeta">
-                    <span>教員クエスト</span>
-                  </div>
-                </button>
+                {(() => {
+                  const isTeacherQuestUnavailable =
+                    !isTeacherQuestLoading &&
+                    (!teacherQuestAvailable || teacherQuestQuestionCount === 0);
+
+                  return (
+                    <button
+                      className={
+                        isTeacherQuestUnavailable
+                          ? "subjectCard questBookCard questBookCardUnavailable questSpecialCard"
+                          : "subjectCard questBookCard questSpecialCard"
+                      }
+                      disabled={
+                        isTeacherQuestUnavailable ||
+                        isTeacherQuestStarting ||
+                        isTeacherQuestLoading ||
+                        isTeacherQuestTransitioning
+                      }
+                      type="button"
+                      aria-label={
+                        isTeacherQuestUnavailable
+                          ? "教員クエスト（現在利用できるクエストはありません）"
+                          : teacherQuestMeta
+                            ? `教員クエスト（${teacherQuestMeta.title}・${teacherQuestQuestionCount}問）`
+                            : `教員クエスト（${teacherQuestQuestionCount}問）`
+                      }
+                      onClick={() => {
+                        void openTeacherQuest();
+                      }}
+                    >
+                      <div className="questBookCoverWrap questTeacherCoverWrap">
+                        <Image
+                          src={characterImage}
+                          alt=""
+                          className={
+                            isTeacherQuestUnavailable
+                              ? "questTeacherCover questBookCoverUnavailable"
+                              : "questTeacherCover"
+                          }
+                          priority
+                        />
+                        {!isTeacherQuestUnavailable ? (
+                          <span className="questUnavailableBadge">
+                            {teacherQuestQuestionCount}問
+                          </span>
+                        ) : null}
+                      </div>
+                      <div className="questBookCardMeta">
+                        <span>教員クエスト</span>
+                        {isTeacherQuestUnavailable ? (
+                          <span className="questUnavailableHint">利用不可</span>
+                        ) : teacherQuestMeta ? (
+                          <span className="questUnavailableHint">{teacherQuestMeta.title}</span>
+                        ) : null}
+                      </div>
+                    </button>
+                  );
+                })()}
 
                 {(() => {
                   const isReviewUnavailable =

@@ -1,5 +1,10 @@
 import { HomeScreen } from "@/components/HomeScreen";
+import { TeacherQuestTransitionProvider } from "@/components/TeacherQuestBattleTransition";
 
 export default function Page() {
-  return <HomeScreen />;
+  return (
+    <TeacherQuestTransitionProvider>
+      <HomeScreen />
+    </TeacherQuestTransitionProvider>
+  );
 }

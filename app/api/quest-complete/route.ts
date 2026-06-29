@@ -18,6 +18,7 @@ type QuestCompleteRequestBody = {
   subcategoryId?: unknown;
   subcategoryIds?: unknown;
   questScope?: unknown;
+  teacherQuestId?: unknown;
   answers?: unknown;
 };
 
@@ -104,7 +105,7 @@ async function saveQuestAttemptHistory(
   supabase: NonNullable<ReturnType<typeof createServiceRoleSupabaseClient>>,
   params: {
     studentId: string;
-    questScope: "subject" | "review";
+    questScope: "subject" | "teacher" | "review";
     subjectId: string | null;
     subcategoryIds: string[];
     questionCount: number;
@@ -164,6 +165,8 @@ export async function POST(request: Request) {
   const questionCount =
     typeof body?.questionCount === "number" ? body.questionCount : null;
   const questScope = parseQuestScope(body?.questScope);
+  const teacherQuestId =
+    typeof body?.teacherQuestId === "string" ? body.teacherQuestId.trim() : null;
   const subjectId =
     typeof body?.subjectId === "string" ? body.subjectId.trim() : null;
   const subcategoryIds = parseSubcategoryIds(body);
@@ -247,6 +250,24 @@ export async function POST(request: Request) {
       questScope: "review",
       subjectId: null,
       subcategoryIds: [],
+      questionCount,
+      correctCount,
+      pointsEarned,
+      answers,
+    });
+  }
+
+  if (
+    questScope === "teacher" &&
+    teacherQuestId &&
+    questionCount !== null &&
+    answers.length > 0
+  ) {
+    await saveQuestAttemptHistory(supabase, {
+      studentId,
+      questScope: "teacher",
+      subjectId: null,
+      subcategoryIds: [teacherQuestId],
       questionCount,
       correctCount,
       pointsEarned,
