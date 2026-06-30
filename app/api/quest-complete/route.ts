@@ -8,6 +8,12 @@ import {
   getSelectableQuestQuestionCounts,
 } from "@/lib/questSubcategories";
 import { createServiceRoleSupabaseClient } from "@/lib/supabaseServiceRole";
+import {
+  appendTeacherQuestCompletion,
+  fetchCompletedTeacherQuestIds,
+  hasCompletedTeacherQuest,
+  removeTeacherQuestCompletion,
+} from "@/lib/teacherQuestCompletions";
 
 export const runtime = "nodejs";
 
@@ -229,9 +235,60 @@ export async function POST(request: Request) {
       ? GACHA_POINTS_PER_TEACHER_QUEST_CORRECT
       : GACHA_POINTS_PER_QUEST_CORRECT;
   const pointsEarned = correctCount * pointsPerCorrect;
+
+  let teacherCompletionClaimed = false;
+
+  if (questScope === "teacher") {
+    if (!teacherQuestId) {
+      return NextResponse.json(
+        { message: "教員クエストIDが不正です。" },
+        { status: 400 },
+      );
+    }
+
+    const { ids: completedIds, error: completedError } =
+      await fetchCompletedTeacherQuestIds(supabase, studentId);
+
+    if (completedError) {
+      console.error("[quest-complete] teacher completed:", completedError);
+      return NextResponse.json({ message: completedError }, { status: 500 });
+    }
+
+    if (hasCompletedTeacherQuest(completedIds, teacherQuestId)) {
+      return NextResponse.json(
+        { message: "この教員クエストはすでにクリア済みです。" },
+        { status: 409 },
+      );
+    }
+
+    const { appended, error: appendError } = await appendTeacherQuestCompletion(
+      supabase,
+      studentId,
+      teacherQuestId,
+    );
+
+    if (appendError) {
+      console.error("[quest-complete] teacher append:", appendError);
+      return NextResponse.json({ message: appendError }, { status: 500 });
+    }
+
+    if (!appended) {
+      return NextResponse.json(
+        { message: "この教員クエストはすでにクリア済みです。" },
+        { status: 409 },
+      );
+    }
+
+    teacherCompletionClaimed = true;
+  }
+
   const result = await awardStudentGachaPoints(supabase, studentId, pointsEarned);
 
   if (!result.ok) {
+    if (teacherCompletionClaimed && teacherQuestId) {
+      await removeTeacherQuestCompletion(supabase, studentId, teacherQuestId);
+    }
+
     return NextResponse.json({ message: result.message }, { status: result.status });
   }
 
@@ -254,24 +311,6 @@ export async function POST(request: Request) {
       questScope: "review",
       subjectId: null,
       subcategoryIds: [],
-      questionCount,
-      correctCount,
-      pointsEarned,
-      answers,
-    });
-  }
-
-  if (
-    questScope === "teacher" &&
-    teacherQuestId &&
-    questionCount !== null &&
-    answers.length > 0
-  ) {
-    await saveQuestAttemptHistory(supabase, {
-      studentId,
-      questScope: "teacher",
-      subjectId: null,
-      subcategoryIds: [teacherQuestId],
       questionCount,
       correctCount,
       pointsEarned,

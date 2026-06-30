@@ -90,7 +90,7 @@ export function getTeacherQuestIntroMessage(
   return `問${questionIndex + 1}／${questionCount}。次の問題だ！`;
 }
 
-function formatTeacherDisplayName(teacherName: string): string {
+export function formatTeacherDisplayName(teacherName: string): string {
   const trimmed = teacherName.normalize("NFKC").trim();
   if (!trimmed) {
     return "先生";

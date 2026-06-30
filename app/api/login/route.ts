@@ -96,20 +96,32 @@ export async function POST(request: Request) {
     );
   }
 
+  const needsProfileSetup = !data.nickname || !data.avatar_icon_id;
+
   let loginProcess: Awaited<ReturnType<typeof processStudentLogin>>;
 
   try {
-    const lastLogin =
-      typeof (data as { students_login?: unknown }).students_login === "string"
-        ? (data as { students_login: string }).students_login
-        : null;
+    if (needsProfileSetup) {
+      loginProcess = {
+        gachaPoints: normalizeGachaPoints(
+          (data as { gacha_points?: unknown }).gacha_points,
+        ),
+        dailyBonusAwarded: false,
+        dailyBonusPoints: 0,
+      };
+    } else {
+      const lastLogin =
+        typeof (data as { students_login?: unknown }).students_login === "string"
+          ? (data as { students_login: string }).students_login
+          : null;
 
-    loginProcess = await processStudentLogin(
-      supabase,
-      data.gakusei_id,
-      normalizeGachaPoints((data as { gacha_points?: unknown }).gacha_points),
-      lastLogin,
-    );
+      loginProcess = await processStudentLogin(
+        supabase,
+        data.gakusei_id,
+        normalizeGachaPoints((data as { gacha_points?: unknown }).gacha_points),
+        lastLogin,
+      );
+    }
   } catch (loginProcessError) {
     console.error("[login] processStudentLogin:", loginProcessError);
     return NextResponse.json(
@@ -152,7 +164,7 @@ export async function POST(request: Request) {
       gachaPoints: loginProcess.gachaPoints,
       dailyLoginBonusAwarded: loginProcess.dailyBonusAwarded,
       dailyLoginBonusPoints: loginProcess.dailyBonusPoints,
-      needsProfileSetup: !data.nickname || !data.avatar_icon_id,
+      needsProfileSetup,
       examDate,
       daysUntilExam: examDate ? getDaysUntilExam(examDate) : null,
     },

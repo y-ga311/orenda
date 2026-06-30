@@ -35,27 +35,15 @@ import tougaiImage from "@/source-images/tougai.png";
 import tougaiCardImage from "@/source-images/tougai_card.png";
 import tourinImage from "@/source-images/tourin.png";
 import tourinCardImage from "@/source-images/tourin_card.png";
-import medal001G from "@/source-images/medal/001G.png";
-import medal002G from "@/source-images/medal/002G.png";
-import medal003G from "@/source-images/medal/003G.png";
-import medal004G from "@/source-images/medal/004G.png";
-import medal005G from "@/source-images/medal/005G.png";
-import medal006G from "@/source-images/medal/006G.png";
-import medal007G from "@/source-images/medal/007G.png";
-import medal008G from "@/source-images/medal/008G.png";
-import medal009G from "@/source-images/medal/009G.png";
-import medal010G from "@/source-images/medal/010G.png";
-import medal011G from "@/source-images/medal/011G.png";
-import medal012G from "@/source-images/medal/012G.png";
-import medal006S from "@/source-images/medal/006S.png";
-import medal010C from "@/source-images/medal/010C.png";
 import { avatarIcons, getAvatarIcon, type AvatarIconId } from "@/lib/avatarIcons";
 import { GACHA_POINTS_PER_TEACHER_QUEST_CORRECT, GACHA_SPIN_COST_PT } from "@/lib/gachaConstants";
+import type { StudentMedalItem } from "@/lib/medalDb";
+import { getMedalImage } from "@/lib/medalImages";
 import { normalizeGachaPoints } from "@/lib/normalizeGachaPoints";
 import {
   isQuestAnswerCorrect,
 } from "@/lib/questQuestions";
-import type { TeacherQuestSummary } from "@/lib/teacherQuestDb";
+import type { TeacherQuestListItem, TeacherQuestSummary } from "@/lib/teacherQuestDb";
 import {
   formatNationalExamSource,
   type QuestAnswerLogEntry,
@@ -81,7 +69,20 @@ import {
 } from "@/components/TeacherQuestBattleScreen";
 import { useTeacherQuestTransition } from "@/components/TeacherQuestBattleTransition";
 import { useBottomNavVisibility } from "@/lib/useBottomNavVisibility";
-import { getTeacherQuestSprite } from "@/lib/teacherQuestSprites";
+import {
+  formatTeacherDisplayName,
+  getTeacherQuestSprite,
+} from "@/lib/teacherQuestSprites";
+
+function formatTeacherQuestEndDate(endDate: string) {
+  const [, month, day] = endDate.split("-");
+
+  if (!month || !day) {
+    return "";
+  }
+
+  return `〜${Number(month)}/${Number(day)}`;
+}
 
 const menuItems = [
   {
@@ -196,64 +197,16 @@ const collectionCards = [
   { title: "関係法規", image: kankeihoukiCardImage },
 ];
 
-type MedalTier = "G" | "S" | "C";
-
-type AchievementMedalEntry = {
-  id: string;
-  title: string;
+type AchievementMedalEntry = StudentMedalItem & {
   image: StaticImageData;
-  medalNo: string;
-  tier: MedalTier;
-  unlocked: boolean;
 };
 
-const medalImageMap: Record<string, StaticImageData> = {
-  "001G": medal001G,
-  "002G": medal002G,
-  "003G": medal003G,
-  "004G": medal004G,
-  "005G": medal005G,
-  "006G": medal006G,
-  "007G": medal007G,
-  "008G": medal008G,
-  "009G": medal009G,
-  "010G": medal010G,
-  "011G": medal011G,
-  "012G": medal012G,
-  "006S": medal006S,
-  "010C": medal010C,
-};
-
-function getMedalImage(medalNo: string, tier: MedalTier) {
-  return medalImageMap[`${medalNo}${tier}`] ?? medalImageMap[`${medalNo}G`];
+function mapStudentMedalsToEntries(medals: StudentMedalItem[]): AchievementMedalEntry[] {
+  return medals.map((medal) => ({
+    ...medal,
+    image: getMedalImage(medal.imageKey, medal.medalNo),
+  }));
 }
-
-const achievementMedalDefs = [
-  { id: "career-nav", title: "キャリアnavi", medalNo: "001", tier: "G", unlocked: true },
-  { id: "company-session", title: "企業説明会", medalNo: "002", tier: "G", unlocked: true },
-  { id: "ankoku", title: "暗刻", medalNo: "003", tier: "G", unlocked: false },
-  { id: "mogusa-factory", title: "もぐさ工場見学", medalNo: "004", tier: "G", unlocked: false },
-  { id: "career-nav2", title: "キャリアnavi2", medalNo: "005", tier: "G", unlocked: false },
-  { id: "anmame", title: "暗豆", medalNo: "006", tier: "S", unlocked: true },
-  { id: "job-session", title: "就職説明会", medalNo: "007", tier: "G", unlocked: false },
-  { id: "anki", title: "暗爺", medalNo: "008", tier: "G", unlocked: true },
-  { id: "sports-win", title: "球技大会優勝", medalNo: "006", tier: "S", unlocked: true },
-  { id: "attendance-95", title: "出席率95%以上", medalNo: "010", tier: "C", unlocked: true },
-  { id: "mock-exam-1st", title: "模擬試験1位", medalNo: "011", tier: "G", unlocked: false },
-  { id: "regular-exam-1st", title: "定期試験1位", medalNo: "010", tier: "C", unlocked: true },
-] as const satisfies ReadonlyArray<{
-  id: string;
-  title: string;
-  medalNo: string;
-  tier: MedalTier;
-  unlocked: boolean;
-}>;
-
-/** Pencil メダル画面（達成一覧）準拠のプレビューデータ */
-const achievementMedals: AchievementMedalEntry[] = achievementMedalDefs.map((medal) => ({
-  ...medal,
-  image: getMedalImage(medal.medalNo, medal.tier),
-}));
 
 type StudySubject = (typeof studySubjects)[number];
 
@@ -514,7 +467,7 @@ export function HomeScreen() {
   const [studyTypeMessage, setStudyTypeMessage] = useState("");
   const [isStudyTypeSubmitting, setIsStudyTypeSubmitting] = useState(false);
   const [questView, setQuestView] = useState<
-    "select" | "setup" | "question" | "result"
+    "select" | "teacher-select" | "setup" | "question" | "result"
   >("select");
   const [selectedQuestSubject, setSelectedQuestSubject] =
     useState<StudySubject | null>(null);
@@ -548,8 +501,8 @@ export function HomeScreen() {
     useState(false);
   const [questReviewQuestionCount, setQuestReviewQuestionCount] = useState(0);
   const [isQuestReviewCountLoading, setIsQuestReviewCountLoading] = useState(false);
-  const [teacherQuestAvailable, setTeacherQuestAvailable] = useState(false);
-  const [teacherQuestQuestionCount, setTeacherQuestQuestionCount] = useState(0);
+  const [teacherQuests, setTeacherQuests] = useState<TeacherQuestListItem[]>([]);
+  const [teacherQuestSelectMessage, setTeacherQuestSelectMessage] = useState("");
   const [teacherQuestMeta, setTeacherQuestMeta] = useState<TeacherQuestSummary | null>(
     null,
   );
@@ -601,6 +554,10 @@ export function HomeScreen() {
   const [gachaVideoKey, setGachaVideoKey] = useState(0);
   const gachaVideoEndedRef = useRef(false);
   const gachaVideoRef = useRef<HTMLVideoElement | null>(null);
+  const [achievementMedals, setAchievementMedals] = useState<AchievementMedalEntry[]>([]);
+  const [isMedalsLoading, setIsMedalsLoading] = useState(false);
+  const [medalsLoadMessage, setMedalsLoadMessage] = useState("");
+  const medalsRequestRef = useRef(0);
   const bottomNavResetKey =
     activeScreen === "quest"
       ? `quest-${questView}`
@@ -742,25 +699,58 @@ export function HomeScreen() {
       if (teacherQuestResponse?.ok) {
         const result = (await teacherQuestResponse.json().catch(() => null)) as {
           available?: boolean;
-          questionCount?: number;
-          quest?: TeacherQuestSummary | null;
+          quests?: TeacherQuestListItem[];
+          questCount?: number;
         } | null;
 
-        setTeacherQuestAvailable(result?.available === true);
-        setTeacherQuestQuestionCount(
-          typeof result?.questionCount === "number" ? result.questionCount : 0,
-        );
-        setTeacherQuestMeta(result?.quest ?? null);
+        const quests = Array.isArray(result?.quests) ? result.quests : [];
+
+        setTeacherQuests(quests);
       } else {
-        setTeacherQuestAvailable(false);
-        setTeacherQuestQuestionCount(0);
-        setTeacherQuestMeta(null);
+        setTeacherQuests([]);
       }
     } finally {
       if (questSelectDataRequestRef.current === requestId) {
         setIsQuestSubjectCountsLoading(false);
         setIsQuestReviewCountLoading(false);
         setIsTeacherQuestLoading(false);
+      }
+    }
+  }, []);
+
+  const loadMedals = useCallback(async () => {
+    const requestId = medalsRequestRef.current + 1;
+    medalsRequestRef.current = requestId;
+    setIsMedalsLoading(true);
+    setMedalsLoadMessage("");
+
+    try {
+      const response = await fetch("/api/medals").catch(() => null);
+
+      if (medalsRequestRef.current !== requestId) {
+        return;
+      }
+
+      if (!response?.ok) {
+        const result = (await response?.json().catch(() => null)) as {
+          message?: string;
+        } | null;
+        setAchievementMedals([]);
+        setMedalsLoadMessage(
+          result?.message ?? "メダル情報の取得に失敗しました。",
+        );
+        return;
+      }
+
+      const result = (await response.json().catch(() => null)) as {
+        medals?: StudentMedalItem[];
+      } | null;
+      const medals = Array.isArray(result?.medals) ? result.medals : [];
+
+      setAchievementMedals(mapStudentMedalsToEntries(medals));
+    } finally {
+      if (medalsRequestRef.current === requestId) {
+        setIsMedalsLoading(false);
       }
     }
   }, []);
@@ -772,6 +762,14 @@ export function HomeScreen() {
 
     void loadQuestSelectData();
   }, [activeScreen, isLoggedInPreview, loadQuestSelectData, questSelectDataVersion]);
+
+  useEffect(() => {
+    if (!isLoggedInPreview || activeScreen !== "medal") {
+      return;
+    }
+
+    void loadMedals();
+  }, [activeScreen, isLoggedInPreview, loadMedals]);
 
   useEffect(() => {
     if (!isLoggedInPreview || activeScreen !== "record") {
@@ -937,23 +935,30 @@ export function HomeScreen() {
     const dailyLoginBonusAwarded = Boolean(result?.student?.dailyLoginBonusAwarded);
 
     setGachaPoints(gachaPoints);
-    setNeedsProfileSetup(Boolean(result?.student?.needsProfileSetup));
+    const needsProfileSetupNext = Boolean(result?.student?.needsProfileSetup);
+    setNeedsProfileSetup(needsProfileSetupNext);
     setActiveScreen("menu");
     setIsLoginOpen(false);
     setIsLoggedInPreview(true);
     setPassword("");
     setMessage("");
-    setLoginSuccessNotice({
-      displayName: result?.student?.nickname || result?.student?.name || "",
-      gachaPoints,
-      dailyBonusAwarded: dailyLoginBonusAwarded,
-      dailyBonusPoints: dailyLoginBonusPoints,
-    });
+
+    if (!needsProfileSetupNext) {
+      setLoginSuccessNotice({
+        displayName: result?.student?.nickname || result?.student?.name || "",
+        gachaPoints,
+        dailyBonusAwarded: dailyLoginBonusAwarded,
+        dailyBonusPoints: dailyLoginBonusPoints,
+      });
+    } else {
+      setLoginSuccessNotice(null);
+    }
   }
 
   async function handleProfileSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setProfileMessage("");
+    const isInitialProfileSetup = needsProfileSetup;
     setIsProfileSubmitting(true);
 
     const response = await fetch("/api/profile", {
@@ -978,6 +983,9 @@ export function HomeScreen() {
       message?: string;
       student?: {
         avatarIconId?: AvatarIconId | null;
+        completedInitialProfileSetup?: boolean;
+        dailyLoginBonusAwarded?: boolean;
+        dailyLoginBonusPoints?: unknown;
         gachaPoints?: unknown;
         name?: string | null;
         nickname?: string | null;
@@ -1001,6 +1009,23 @@ export function HomeScreen() {
       setProfileMessage("変更を保存しました。");
     } else {
       setProfileMessage("");
+    }
+
+    if (
+      isInitialProfileSetup ||
+      result?.student?.completedInitialProfileSetup
+    ) {
+      const dailyLoginBonusPoints = normalizeGachaPoints(
+        result?.student?.dailyLoginBonusPoints,
+      );
+
+      setActiveScreen("menu");
+      setLoginSuccessNotice({
+        displayName: result?.student?.nickname ?? nickname,
+        gachaPoints: normalizeGachaPoints(result?.student?.gachaPoints ?? gachaPoints),
+        dailyBonusAwarded: Boolean(result?.student?.dailyLoginBonusAwarded),
+        dailyBonusPoints: dailyLoginBonusPoints,
+      });
     }
   }
 
@@ -1062,6 +1087,8 @@ export function HomeScreen() {
     setGachaResultCard(null);
     setIsGachaPlaying(false);
     setGachaVideoKey(0);
+    setAchievementMedals([]);
+    setMedalsLoadMessage("");
     setElapsedSeconds(0);
     setIsStopwatchRunning(false);
     setNeedsProfileSetup(false);
@@ -1116,8 +1143,7 @@ export function HomeScreen() {
     setIsQuestReviewCountLoading(false);
     setIsReviewQuest(false);
     setIsQuestReviewStarting(false);
-    setTeacherQuestAvailable(false);
-    setTeacherQuestQuestionCount(0);
+    setTeacherQuests([]);
     setTeacherQuestMeta(null);
     setTeacherQuestId(null);
     setIsTeacherQuestLoading(false);
@@ -1148,6 +1174,7 @@ export function HomeScreen() {
     setTeacherQuestId(null);
     setTeacherQuestMeta(null);
     setTeacherQuestPhase("encounter");
+    setTeacherQuestSelectMessage("");
     setQuestSelectDataVersion((current) => current + 1);
   }
 
@@ -1284,30 +1311,42 @@ export function HomeScreen() {
     setQuestView("question");
   }
 
-  async function openTeacherQuest() {
+  async function startTeacherQuest(questId: string) {
     if (
       isTeacherQuestStarting ||
       isTeacherQuestTransitioning ||
-      isTeacherQuestLoading ||
-      !teacherQuestAvailable ||
-      teacherQuestQuestionCount === 0
+      isTeacherQuestLoading
     ) {
       return;
     }
+
+    if (teacherQuests.find((quest) => quest.id === questId)?.completed) {
+      setTeacherQuestSelectMessage("この教員クエストはすでにクリア済みです。");
+      return;
+    }
+
+    setTeacherQuestSelectMessage("");
 
     runTeacherQuestTransition(async () => {
       setIsTeacherQuestStarting(true);
 
       const response = await fetch("/api/teacher-quest", {
         method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ questId }),
       }).catch(() => null);
 
       setIsTeacherQuestStarting(false);
 
       if (!response?.ok) {
-        setTeacherQuestAvailable(false);
-        setTeacherQuestQuestionCount(0);
-        setTeacherQuestMeta(null);
+        const result = (await response?.json().catch(() => null)) as {
+          message?: string;
+        } | null;
+        setTeacherQuestSelectMessage(
+          result?.message ?? "教員クエストを開始できませんでした。",
+        );
         return { ok: false };
       }
 
@@ -1320,9 +1359,6 @@ export function HomeScreen() {
       const quest = result?.quest ?? null;
 
       if (questions.length === 0 || !quest) {
-        setTeacherQuestAvailable(false);
-        setTeacherQuestQuestionCount(0);
-        setTeacherQuestMeta(null);
         return { ok: false };
       }
 
@@ -1350,6 +1386,32 @@ export function HomeScreen() {
 
       return { ok: true };
     });
+  }
+
+  function openTeacherQuestEntry() {
+    if (
+      isTeacherQuestStarting ||
+      isTeacherQuestTransitioning ||
+      isTeacherQuestLoading ||
+      teacherQuests.length === 0
+    ) {
+      return;
+    }
+
+    const availableTeacherQuests = teacherQuests.filter((quest) => !quest.completed);
+
+    if (availableTeacherQuests.length === 0) {
+      return;
+    }
+
+    setTeacherQuestSelectMessage("");
+
+    if (teacherQuests.length === 1) {
+      void startTeacherQuest(availableTeacherQuests[0].id);
+      return;
+    }
+
+    setQuestView("teacher-select");
   }
 
   async function openReviewQuest() {
@@ -1811,7 +1873,6 @@ export function HomeScreen() {
             </form>
           </div>
         </section>
-        {loginSuccessNoticeModal}
       </main>
     );
   }
@@ -2088,17 +2149,6 @@ export function HomeScreen() {
       const isLastQuestion = questionNumber >= selectedQuestQuestionCount;
 
       if (isTeacherQuest && teacherQuestMeta) {
-        function handleTeacherQuestBack() {
-          setSelectedQuestChoice(null);
-          setQuestAnswerSubmitted(false);
-          setTeacherQuestPhase("encounter");
-          setIsTeacherQuest(false);
-          setTeacherQuestId(null);
-          setTeacherQuestMeta(null);
-          setQuestSessionQuestions([]);
-          returnToQuestSelect();
-        }
-
         function handleTeacherQuestSelectChoice(index: number) {
           if (questAnswerSubmitted || teacherQuestPhase !== "choice") {
             return;
@@ -2147,7 +2197,6 @@ export function HomeScreen() {
               selectedChoice={selectedQuestChoice}
               teacherName={teacherQuestMeta.teacherName}
               teacherSprite={getTeacherQuestSprite(teacherQuestMeta.teacherName)}
-              onBack={handleTeacherQuestBack}
               onEncounterComplete={() => setTeacherQuestPhase("intro")}
               onFeedbackContinue={handleTeacherQuestFeedbackContinue}
               onIntroContinue={() => setTeacherQuestPhase("choice")}
@@ -2377,6 +2426,98 @@ export function HomeScreen() {
                 >
                   {isTeacherQuest ? "クエスト一覧に戻る" : "科目一覧に戻る"}
                 </button>
+              </section>
+            </div>
+          </section>
+        </main>
+      );
+    }
+
+    if (questView === "teacher-select") {
+      return (
+        <main className="appShell">
+          <section
+            className="phoneFrame timerScreen questScreen"
+            aria-label="教員クエスト選択"
+            style={{ backgroundImage: `url(${backgroundImage.src})` }}
+          >
+            <header className="timerHeader">
+              <button
+                className="timerBackButton"
+                type="button"
+                onClick={() => {
+                  setQuestView("select");
+                }}
+              >
+                <span aria-hidden="true">‹</span>
+                戻る
+              </button>
+              <h1>教員クエスト</h1>
+              <span className="timerHeaderBalance" aria-hidden="true" />
+            </header>
+
+            <div className="questSetupMain">
+              <section className="questSetupCard">
+                <h2 className="questSetupTitle">クエストを選ぶ</h2>
+                <p className="questSetupLead">
+                  挑戦する教員クエストを選んでください。
+                </p>
+
+                {teacherQuestSelectMessage ? (
+                  <p className="questSetupNote questSetupError" role="alert">
+                    {teacherQuestSelectMessage}
+                  </p>
+                ) : null}
+
+                {teacherQuests.length > 4 ? (
+                  <p className="questScrollHint questSetupScrollHint">
+                    <span aria-hidden="true">⇅</span>
+                    上下にスクロールして選べます
+                  </p>
+                ) : null}
+
+                <div className="teacherQuestSelectList">
+                  {teacherQuests.map((quest) => {
+                    const periodLabel = formatTeacherQuestEndDate(quest.endDate);
+                    const teacherDisplayName = formatTeacherDisplayName(quest.teacherName);
+                    const isCompleted = quest.completed;
+
+                    return (
+                      <button
+                        className={
+                          isCompleted
+                            ? "teacherQuestSelectOption teacherQuestSelectOptionCompleted"
+                            : "teacherQuestSelectOption"
+                        }
+                        disabled={
+                          isCompleted ||
+                          isTeacherQuestStarting ||
+                          isTeacherQuestLoading ||
+                          isTeacherQuestTransitioning
+                        }
+                        key={quest.id}
+                        type="button"
+                        aria-label={
+                          isCompleted
+                            ? `${quest.title}（${teacherDisplayName}・クリア済み）`
+                            : `${quest.title}（${teacherDisplayName}・${quest.questionCount}問）`
+                        }
+                        onClick={() => {
+                          void startTeacherQuest(quest.id);
+                        }}
+                      >
+                        <span className="teacherQuestSelectOptionTitle">{quest.title}</span>
+                        <span className="teacherQuestSelectOptionMeta">
+                          {teacherDisplayName}
+                          {periodLabel ? `　${periodLabel}` : ""}
+                        </span>
+                        <span className="teacherQuestSelectOptionCount">
+                          {isCompleted ? "クリア済み" : `${quest.questionCount}問`}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
               </section>
             </div>
           </section>
@@ -2624,9 +2765,23 @@ export function HomeScreen() {
 
               <div className="questBookRow">
                 {(() => {
+                  const availableTeacherQuests = teacherQuests.filter(
+                    (quest) => !quest.completed,
+                  );
+                  const allTeacherQuestsCompleted =
+                    teacherQuests.length > 0 && availableTeacherQuests.length === 0;
                   const isTeacherQuestUnavailable =
                     !isTeacherQuestLoading &&
-                    (!teacherQuestAvailable || teacherQuestQuestionCount === 0);
+                    (teacherQuests.length === 0 || allTeacherQuestsCompleted);
+                  const teacherQuestBadgeLabel =
+                    availableTeacherQuests.length > 1
+                      ? `${availableTeacherQuests.length}件`
+                      : `${availableTeacherQuests[0]?.questionCount ?? teacherQuests[0]?.questionCount ?? 0}問`;
+                  const teacherQuestHint = allTeacherQuestsCompleted
+                    ? "クリア済み"
+                    : availableTeacherQuests.length > 1
+                      ? `${availableTeacherQuests.length}件から選択`
+                      : (availableTeacherQuests[0]?.title ?? null);
 
                   return (
                     <button
@@ -2643,14 +2798,18 @@ export function HomeScreen() {
                       }
                       type="button"
                       aria-label={
-                        isTeacherQuestUnavailable
-                          ? "教員クエスト（現在利用できるクエストはありません）"
-                          : teacherQuestMeta
-                            ? `教員クエスト（${teacherQuestMeta.title}・${teacherQuestQuestionCount}問）`
-                            : `教員クエスト（${teacherQuestQuestionCount}問）`
+                        allTeacherQuestsCompleted
+                          ? "教員クエスト（クリア済み）"
+                          : isTeacherQuestUnavailable
+                            ? "教員クエスト（現在利用できるクエストはありません）"
+                            : availableTeacherQuests.length > 1
+                              ? `教員クエスト（${availableTeacherQuests.length}件）`
+                              : availableTeacherQuests[0]
+                                ? `教員クエスト（${availableTeacherQuests[0].title}・${availableTeacherQuests[0].questionCount}問）`
+                                : "教員クエスト"
                       }
                       onClick={() => {
-                        void openTeacherQuest();
+                        openTeacherQuestEntry();
                       }}
                     >
                       <div className="questBookCoverWrap questTeacherCoverWrap">
@@ -2666,16 +2825,18 @@ export function HomeScreen() {
                         />
                         {!isTeacherQuestUnavailable ? (
                           <span className="questUnavailableBadge">
-                            {teacherQuestQuestionCount}問
+                            {teacherQuestBadgeLabel}
                           </span>
                         ) : null}
                       </div>
                       <div className="questBookCardMeta">
                         <span>教員クエスト</span>
                         {isTeacherQuestUnavailable ? (
-                          <span className="questUnavailableHint">利用不可</span>
-                        ) : teacherQuestMeta ? (
-                          <span className="questUnavailableHint">{teacherQuestMeta.title}</span>
+                          <span className="questUnavailableHint">
+                            {allTeacherQuestsCompleted ? "クリア済み" : "利用不可"}
+                          </span>
+                        ) : teacherQuestHint ? (
+                          <span className="questUnavailableHint">{teacherQuestHint}</span>
                         ) : null}
                       </div>
                     </button>
@@ -3416,25 +3577,31 @@ export function HomeScreen() {
                 <div className="gachaMachine" aria-live="polite">
                   {gachaResultCard ? (
                     <div className="gachaResult">
-                      <span>GET!</span>
-                      <Image
-                        src={gachaResultCard.image}
-                        alt={gachaResultCard.title}
-                        className="gachaResultCard"
-                        priority
-                      />
-                      <strong>{gachaResultCard.title}</strong>
+                      <span className="gachaResultLabel">GET!</span>
+                      <div className="gachaResultCardWrap">
+                        <Image
+                          src={gachaResultCard.image}
+                          alt={gachaResultCard.title}
+                          className="gachaResultCard"
+                          fill
+                          sizes="(max-width: 430px) 72vw, 280px"
+                          priority
+                        />
+                      </div>
+                      <strong className="gachaResultTitle">{gachaResultCard.title}</strong>
                     </div>
                   ) : (
                     <div className="gachaMachineIdle">
-                      <Image
-                        src="/gacha.jpg"
-                        alt=""
-                        className="gachaMachineIdleImage"
-                        width={780}
-                        height={780}
-                        priority
-                      />
+                      <div className="gachaMachineIdleImageWrap">
+                        <Image
+                          src="/gacha.jpg"
+                          alt=""
+                          className="gachaMachineIdleImage"
+                          fill
+                          sizes="(max-width: 430px) 100vw, 390px"
+                          priority
+                        />
+                      </div>
                     </div>
                   )}
                 </div>
@@ -3552,41 +3719,53 @@ export function HomeScreen() {
                 </div>
               </div>
 
+              {isMedalsLoading ? (
+                <p className="questSetupNote medalLoadingNote">メダル情報を読み込んでいます...</p>
+              ) : null}
+
+              {medalsLoadMessage ? (
+                <p className="questSetupNote questSetupError" role="alert">
+                  {medalsLoadMessage}
+                </p>
+              ) : null}
+
               <div ref={bindBottomNavScrollRef} className="medalBadgeScroll">
-                <div className="medalBadgeGrid" role="list" aria-label="達成メダル一覧">
-                  {Array.from({ length: medalRows }, (_, rowIndex) => (
-                    <div className="medalGridRow" key={rowIndex}>
-                      {achievementMedals.slice(rowIndex * 3, rowIndex * 3 + 3).map((medal) => (
-                        <div
-                          className={`medalCell${medal.unlocked ? "" : " medalCell--locked"}`}
-                          key={medal.id}
-                          role="listitem"
-                        >
-                          <div className="medalRingWrap" aria-hidden="true">
-                            <div className="medalRingInner">
-                              <div className="medalThumbClip">
-                                <Image
-                                  src={medal.image}
-                                  alt=""
-                                  className="medalBadgeThumb"
-                                  fill
-                                  sizes="(max-width: 430px) 31vw, 116px"
-                                />
+                {!isMedalsLoading && achievementMedals.length > 0 ? (
+                  <div className="medalBadgeGrid" role="list" aria-label="達成メダル一覧">
+                    {Array.from({ length: medalRows }, (_, rowIndex) => (
+                      <div className="medalGridRow" key={rowIndex}>
+                        {achievementMedals.slice(rowIndex * 3, rowIndex * 3 + 3).map((medal) => (
+                          <div
+                            className={`medalCell${medal.unlocked ? "" : " medalCell--locked"}`}
+                            key={medal.id}
+                            role="listitem"
+                          >
+                            <div className="medalRingWrap" aria-hidden="true">
+                              <div className="medalRingInner">
+                                <div className="medalThumbClip">
+                                  <Image
+                                    src={medal.image}
+                                    alt=""
+                                    className="medalBadgeThumb"
+                                    fill
+                                    sizes="(max-width: 430px) 31vw, 116px"
+                                  />
+                                </div>
                               </div>
                             </div>
+                            <p
+                              className={
+                                medal.unlocked ? "medalBadgeLabel" : "medalBadgeLabel medalBadgeLabelLocked"
+                              }
+                            >
+                              {medal.title}
+                            </p>
                           </div>
-                          <p
-                            className={
-                              medal.unlocked ? "medalBadgeLabel" : "medalBadgeLabel medalBadgeLabelLocked"
-                            }
-                          >
-                            {medal.title}
-                          </p>
-                        </div>
-                      ))}
-                    </div>
-                  ))}
-                </div>
+                        ))}
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
               </div>
             </section>
           </div>

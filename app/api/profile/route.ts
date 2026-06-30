@@ -1,10 +1,11 @@
-import { createClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { isAvatarIconId } from "@/lib/avatarIconIds";
 import { normalizeGachaPoints } from "@/lib/normalizeGachaPoints";
+import { processStudentLogin } from "@/lib/processStudentLogin";
 import { parseStudyTypeId } from "@/lib/studyTypeIds";
 import { decryptStudentName } from "@/lib/studentNameCrypto.server";
+import { createServiceRoleSupabaseClient } from "@/lib/supabaseServiceRole";
 
 export const runtime = "nodejs";
 
@@ -43,22 +44,30 @@ export async function POST(request: Request) {
     );
   }
 
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const supabase = createServiceRoleSupabaseClient();
 
-  if (!supabaseUrl || !serviceRoleKey) {
+  if (!supabase) {
     return NextResponse.json(
       { message: "Supabase接続情報が未設定です。" },
       { status: 500 },
     );
   }
 
-  const supabase = createClient(supabaseUrl, serviceRoleKey, {
-    auth: {
-      persistSession: false,
-      autoRefreshToken: false,
-    },
-  });
+  const { data: existingStudent, error: fetchError } = await supabase
+    .from("students")
+    .select("nickname, avatar_icon_id, gacha_points, students_login")
+    .eq("gakusei_id", studentId)
+    .maybeSingle();
+
+  if (fetchError || !existingStudent) {
+    return NextResponse.json(
+      { message: "学生情報の取得に失敗しました。" },
+      { status: 500 },
+    );
+  }
+
+  const needsInitialProfileSetup =
+    !existingStudent.nickname || !existingStudent.avatar_icon_id;
 
   const { data, error } = await supabase
     .from("students")
@@ -78,6 +87,31 @@ export async function POST(request: Request) {
     );
   }
 
+  let gachaPoints = normalizeGachaPoints(
+    (data as { gacha_points?: unknown }).gacha_points,
+  );
+  let dailyLoginBonusAwarded = false;
+  let dailyLoginBonusPoints = 0;
+
+  if (needsInitialProfileSetup) {
+    try {
+      const loginProcess = await processStudentLogin(
+        supabase,
+        studentId,
+        normalizeGachaPoints(existingStudent.gacha_points),
+        typeof existingStudent.students_login === "string"
+          ? existingStudent.students_login
+          : null,
+      );
+
+      gachaPoints = loginProcess.gachaPoints;
+      dailyLoginBonusAwarded = loginProcess.dailyBonusAwarded;
+      dailyLoginBonusPoints = loginProcess.dailyBonusPoints;
+    } catch (loginProcessError) {
+      console.error("[profile] processStudentLogin:", loginProcessError);
+    }
+  }
+
   return NextResponse.json({
     student: {
       name: await decryptStudentName(data.name),
@@ -86,9 +120,10 @@ export async function POST(request: Request) {
       studyTypeId: parseStudyTypeId(
         (data as { study_type_id?: unknown }).study_type_id,
       ),
-      gachaPoints: normalizeGachaPoints(
-        (data as { gacha_points?: unknown }).gacha_points,
-      ),
+      gachaPoints,
+      dailyLoginBonusAwarded,
+      dailyLoginBonusPoints,
+      completedInitialProfileSetup: needsInitialProfileSetup,
     },
   });
 }

@@ -955,6 +955,11 @@ button {
   line-height: 1.5;
 }
 
+.questSetupError {
+  color: #d70015;
+  font-weight: 600;
+}
+
 .questSetupFieldset {
   display: grid;
   gap: 12px;
@@ -1005,6 +1010,91 @@ button {
   color: #6e6e73;
   font-size: 12px;
   font-weight: 600;
+}
+
+.teacherQuestSelectList {
+  display: grid;
+  gap: 10px;
+  max-height: min(420px, 52svh);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-right: 2px;
+  -webkit-overflow-scrolling: touch;
+}
+
+.teacherQuestSelectOption {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 4px 12px;
+  align-items: center;
+  border: 0;
+  border-radius: 16px;
+  padding: 14px 16px;
+  background: #007aff;
+  color: #fff;
+  text-align: left;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 122, 255, 0.24);
+}
+
+.teacherQuestSelectOption:disabled {
+  cursor: not-allowed;
+  opacity: 0.72;
+}
+
+.teacherQuestSelectOptionTitle {
+  grid-column: 1;
+  color: #fff;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.teacherQuestSelectOptionMeta {
+  grid-column: 1;
+  color: rgba(255, 255, 255, 0.88);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+.teacherQuestSelectOptionCount {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  align-self: center;
+  border-radius: 999px;
+  padding: 6px 10px;
+  background: #fff;
+  color: #007aff;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.teacherQuestSelectOption:not(:disabled):active {
+  background: #0066d6;
+}
+
+.teacherQuestSelectOption:focus-visible {
+  outline: 3px solid rgba(0, 122, 255, 0.35);
+  outline-offset: 2px;
+}
+
+.teacherQuestSelectOptionCompleted {
+  background: #8e8e93;
+  box-shadow: none;
+}
+
+.teacherQuestSelectOptionCompleted .teacherQuestSelectOptionCount {
+  background: rgba(255, 255, 255, 0.92);
+  color: #636366;
+  font-size: 11px;
+  padding: 6px 8px;
+}
+
+.teacherQuestSelectOptionCompleted:disabled {
+  opacity: 1;
 }
 
 .questSubcategoryOption:has(input:checked) {
@@ -2044,6 +2134,7 @@ button {
   display: grid;
   grid-template-columns: 64px 1fr 64px;
   align-items: center;
+  flex-shrink: 0;
   min-height: 62px;
   padding: max(12px, env(safe-area-inset-top)) 12px 10px;
 }
@@ -2302,6 +2393,11 @@ button {
   padding-block: 2px 8px;
 }
 
+.medalLoadingNote {
+  margin: 0;
+  text-align: center;
+}
+
 .medalBadgeGrid {
   display: flex;
   flex-direction: column;
@@ -2412,18 +2508,26 @@ button {
 .gachaContent {
   display: flex;
   flex-direction: column;
-  min-height: 0;
   flex: 1;
+  min-height: 0;
   overflow: hidden;
 }
 
+.collectionScreen:not(.collectionScreen--gachaVideo) .gachaContent {
+  padding-bottom: calc(72px + max(8px, env(safe-area-inset-bottom, 0px)));
+  box-sizing: border-box;
+}
+
 .collectionScreen--gachaVideo .gachaContent {
+  flex: 1;
+  min-height: 0;
   padding-inline: 0;
   padding-bottom: max(8px, env(safe-area-inset-bottom, 0px));
+  box-sizing: border-box;
 }
 
 .gachaVideoStage {
-  flex: 1;
+  flex: 1 1 auto;
   min-height: 0;
   width: 100%;
   display: flex;
@@ -2432,50 +2536,68 @@ button {
   padding: 0;
   overflow: hidden;
   background: #000;
+  box-sizing: border-box;
 }
 
 .gachaMovieCinematic {
   display: block;
   width: 100%;
   height: 100%;
-  max-width: none;
-  max-height: none;
+  max-width: 100%;
+  max-height: 100%;
   border-radius: 0;
   object-fit: contain;
+  object-position: center;
   background: #000;
 }
 
 .gachaPanel {
-  display: grid;
-  grid-template-rows: auto auto auto minmax(0, 1fr) auto auto;
-  height: 100%;
-  gap: 16px;
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+  gap: clamp(6px, 1svh, 12px);
+  overflow: hidden;
   border: 1px solid #e5e5ea;
   border-radius: 28px;
-  padding: 16px;
+  padding: clamp(8px, 1.4svh, 14px);
   background: #fff;
   box-shadow: 0 6px 16px rgba(0, 0, 0, 0.07);
+}
+
+.gachaPanel > h2,
+.gachaPanel > p,
+.gachaPanel > .collectionTabs,
+.gachaPanel > .gachaPointRow,
+.gachaPanel > .gachaButton,
+.gachaPanel > .gachaPointShortage,
+.gachaPanel > .formMessage {
+  flex-shrink: 0;
 }
 
 .gachaPanel h2 {
   margin: 0;
   color: #ff9f0a;
-  font-size: 20px;
+  font-size: clamp(17px, 4.6vw, 20px);
   font-weight: 800;
   text-align: center;
+  line-height: 1.2;
 }
 
 .gachaPanel p {
-  margin: -8px 0 0;
+  margin: -4px 0 0;
   color: #6e6e73;
-  font-size: 13px;
+  font-size: clamp(11px, 3.2vw, 13px);
   text-align: center;
+  line-height: 1.35;
 }
 
 .gachaMachine {
-  display: grid;
+  display: flex;
+  flex: 1 1 0;
+  align-items: stretch;
+  justify-content: center;
   min-height: 0;
-  place-items: center;
   overflow: hidden;
   border: 1.5px solid #c4b5fd;
   border-radius: 24px;
@@ -2484,47 +2606,79 @@ button {
 }
 
 .gachaMachineIdle {
-  display: grid;
+  display: flex;
+  flex: 1 1 auto;
+  align-items: stretch;
+  align-self: stretch;
+  justify-content: center;
   width: 100%;
-  height: 100%;
-  min-height: min(42svh, 280px);
-  place-items: center;
+  min-height: 0;
+  padding: clamp(2px, 0.6svh, 6px);
+  box-sizing: border-box;
+}
+
+.gachaMachineIdleImageWrap {
+  position: relative;
+  flex: 1 1 auto;
+  width: 100%;
+  min-height: 0;
 }
 
 .gachaMachineIdleImage {
-  width: 100%;
-  height: 100%;
-  min-height: min(42svh, 280px);
-  border-radius: 22px;
-  object-fit: cover;
+  object-fit: contain;
   object-position: center;
 }
 
 .gachaResult {
-  display: grid;
-  gap: 10px;
-  place-items: center;
-  padding: 18px;
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  align-items: center;
+  align-self: stretch;
+  justify-content: center;
+  width: 100%;
+  min-height: 0;
+  gap: clamp(2px, 0.6svh, 6px);
+  padding: clamp(4px, 1svh, 10px);
+  box-sizing: border-box;
 }
 
-.gachaResult span {
+.gachaResultLabel {
+  flex-shrink: 0;
   color: #ff9f0a;
-  font-size: 22px;
+  font-size: clamp(15px, 4.2vw, 20px);
   font-weight: 900;
   letter-spacing: 0.08em;
+  line-height: 1.1;
+}
+
+.gachaResultCardWrap {
+  position: relative;
+  flex: 1 1 auto;
+  width: min(100%, clamp(220px, 72vw, 280px));
+  min-height: 0;
+  align-self: center;
 }
 
 .gachaResultCard {
-  width: min(58vw, 184px);
-  max-height: min(48svh, 300px);
-  border-radius: 10px;
   object-fit: contain;
-  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.2);
+  object-position: center;
+  filter: drop-shadow(0 12px 28px rgba(0, 0, 0, 0.2));
 }
 
-.gachaResult strong {
+.gachaResultTitle {
+  flex-shrink: 0;
+  max-width: 100%;
+  margin: 0;
+  padding-inline: 4px;
+  overflow: hidden;
   color: #1d1d1f;
-  font-size: 15px;
+  font-size: clamp(13px, 3.6vw, 15px);
+  font-weight: 700;
+  line-height: 1.3;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .gachaPointRow {
@@ -2532,7 +2686,7 @@ button {
   align-items: center;
   justify-content: space-between;
   border-radius: 14px;
-  padding: 12px 14px;
+  padding: clamp(8px, 1.4svh, 12px) 14px;
   background: #f2f2f7;
 }
 
@@ -2548,8 +2702,17 @@ button {
   font-weight: 800;
 }
 
+.gachaPanel .collectionTab {
+  padding: clamp(7px, 1.2svh, 10px) 4px;
+  font-size: clamp(10px, 2.8vw, 11px);
+}
+
+.gachaPanel .collectionTab span {
+  font-size: clamp(18px, 4.8vw, 22px);
+}
+
 .gachaButton {
-  min-height: 52px;
+  min-height: clamp(46px, 7svh, 52px);
   border: 0;
   border-radius: 16px;
   background: #007aff;
@@ -3010,6 +3173,24 @@ button {
   .examCountdown {
     padding: 12px;
   }
+
+  .gachaPanel {
+    gap: 8px;
+    padding: 10px;
+  }
+
+  .gachaPanel .collectionTab {
+    padding: 6px 2px;
+    font-size: 10px;
+  }
+
+  .gachaPanel .collectionTab span {
+    font-size: 18px;
+  }
+
+  .gachaButton {
+    min-height: 44px;
+  }
 }
 
 @media (min-height: 900px) {
@@ -3031,22 +3212,6 @@ button {
   background: #e8dcc8;
   font-family: "DotGothic16", sans-serif;
   color: #2a2a2a;
-}
-
-.teacherQuestBackButton {
-  position: absolute;
-  top: max(10px, env(safe-area-inset-top));
-  left: 10px;
-  z-index: 4;
-  border: 2px solid #3a3a3a;
-  border-radius: 6px;
-  min-height: 36px;
-  padding: 6px 10px;
-  background: rgba(248, 248, 248, 0.92);
-  color: #2a2a2a;
-  font-family: "DotGothic16", sans-serif;
-  font-size: 13px;
-  line-height: 1;
 }
 
 .teacherQuestScene {

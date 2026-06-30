@@ -29,7 +29,6 @@ type TeacherQuestBattleScreenProps = {
   isCompleting: boolean;
   isLastQuestion: boolean;
   completeMessage: string;
-  onBack: () => void;
   onEncounterComplete: () => void;
   onIntroContinue: () => void;
   onSelectChoice: (index: number) => void;
@@ -71,7 +70,6 @@ export function TeacherQuestBattleScreen({
   isCompleting,
   isLastQuestion,
   completeMessage,
-  onBack,
   onEncounterComplete,
   onIntroContinue,
   onSelectChoice,
@@ -124,15 +122,6 @@ export function TeacherQuestBattleScreen({
 
   return (
     <section className="phoneFrame teacherQuestScreen" aria-label="教員クエスト">
-      <button
-        className="teacherQuestBackButton"
-        type="button"
-        onClick={onBack}
-        aria-label="戻る"
-      >
-        ‹ 戻る
-      </button>
-
       <div className="teacherQuestScene" aria-hidden="true">
         <div className="teacherQuestBackgroundLayer">
           <Image

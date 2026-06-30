@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getJapanDateParts } from "@/lib/japanDate";
 import type { QuestSessionQuestion } from "@/lib/questDbTypes";
+import { fetchCompletedTeacherQuestIds } from "@/lib/teacherQuestCompletions";
 
 export type TeacherQuestRow = {
   id: string;
@@ -38,6 +39,11 @@ export type TeacherQuestSession = {
   quest: TeacherQuestSummary;
   questions: QuestSessionQuestion[];
   questionCount: number;
+};
+
+export type TeacherQuestListItem = TeacherQuestSummary & {
+  questionCount: number;
+  completed: boolean;
 };
 
 function getJapanTodayDateKey() {
@@ -89,13 +95,9 @@ function mapTeacherQuestQuestionRow(row: TeacherQuestQuestionRow): QuestSessionQ
   };
 }
 
-/**
- * 公開中かつ今日（JST）が掲載期間内の教員クエストを1件選ぶ。
- * 複数ある場合は publish_date が最も新しいものを優先する。
- */
-export async function fetchActiveTeacherQuest(
+async function fetchActiveTeacherQuestRows(
   supabase: SupabaseClient,
-): Promise<{ quest: TeacherQuestRow | null; error: string | null }> {
+): Promise<{ quests: TeacherQuestRow[]; error: string | null }> {
   const { data, error } = await supabase
     .from("teacher_quests")
     .select(
@@ -105,15 +107,74 @@ export async function fetchActiveTeacherQuest(
     .order("publish_date", { ascending: false });
 
   if (error) {
-    return { quest: null, error: error.message };
+    return { quests: [], error: error.message };
   }
 
-  const activeQuest =
-    ((data ?? []) as TeacherQuestRow[]).find((row) =>
-      isTeacherQuestActiveOnDate(row.publish_date, row.end_date),
-    ) ?? null;
+  const activeQuests = ((data ?? []) as TeacherQuestRow[]).filter((row) =>
+    isTeacherQuestActiveOnDate(row.publish_date, row.end_date),
+  );
 
-  return { quest: activeQuest, error: null };
+  return { quests: activeQuests, error: null };
+}
+
+/**
+ * 公開中かつ今日（JST）が掲載期間内の教員クエスト一覧を返す。
+ */
+export async function fetchActiveTeacherQuestList(
+  supabase: SupabaseClient,
+  studentId?: string | null,
+): Promise<{ quests: TeacherQuestListItem[]; error: string | null }> {
+  const { quests, error } = await fetchActiveTeacherQuestRows(supabase);
+
+  if (error) {
+    return { quests: [], error };
+  }
+
+  if (quests.length === 0) {
+    return { quests: [], error: null };
+  }
+
+  const questIds = quests.map((quest) => quest.id);
+  const { data: questionRows, error: questionCountError } = await supabase
+    .from("teacher_quest_questions")
+    .select("quest_id")
+    .in("quest_id", questIds);
+
+  if (questionCountError) {
+    return { quests: [], error: questionCountError.message };
+  }
+
+  const questionCountByQuestId = new Map<string, number>();
+
+  for (const row of (questionRows ?? []) as { quest_id: string }[]) {
+    questionCountByQuestId.set(
+      row.quest_id,
+      (questionCountByQuestId.get(row.quest_id) ?? 0) + 1,
+    );
+  }
+
+  let completedIds: string[] = [];
+
+  if (studentId) {
+    const completedResult = await fetchCompletedTeacherQuestIds(supabase, studentId);
+    if (completedResult.error) {
+      return { quests: [], error: completedResult.error };
+    }
+
+    completedIds = completedResult.ids;
+  }
+
+  const completedIdSet = new Set(completedIds);
+
+  const list = quests
+    .map((row) => ({
+      ...mapTeacherQuestSummary(row),
+      questionCount: questionCountByQuestId.get(row.id) ?? 0,
+      completed: completedIdSet.has(row.id),
+    }))
+    .filter((quest) => quest.questionCount > 0);
+
+  return { quests: list, error: null };
 }
 
 export async function fetchTeacherQuestQuestions(
@@ -143,17 +204,27 @@ export async function fetchTeacherQuestQuestions(
   return { questions, error: null };
 }
 
-export async function fetchTeacherQuestSession(
+export async function fetchTeacherQuestSessionById(
   supabase: SupabaseClient,
+  questId: string,
 ): Promise<{ session: TeacherQuestSession | null; error: string | null }> {
-  const { quest, error: questError } = await fetchActiveTeacherQuest(supabase);
+  const { data, error } = await supabase
+    .from("teacher_quests")
+    .select(
+      "id, title, teacher_employee_number, teacher_name, publish_date, end_date, status",
+    )
+    .eq("id", questId)
+    .eq("status", "published")
+    .maybeSingle();
 
-  if (questError) {
-    return { session: null, error: questError };
+  if (error) {
+    return { session: null, error: error.message };
   }
 
-  if (!quest) {
-    return { session: null, error: null };
+  const quest = (data as TeacherQuestRow | null) ?? null;
+
+  if (!quest || !isTeacherQuestActiveOnDate(quest.publish_date, quest.end_date)) {
+    return { session: null, error: "指定された教員クエストは現在利用できません。" };
   }
 
   const { questions, error: questionsError } = await fetchTeacherQuestQuestions(
@@ -172,21 +243,5 @@ export async function fetchTeacherQuestSession(
       questionCount: questions.length,
     },
     error: null,
-  };
-}
-
-export function getTeacherQuestAvailability(session: TeacherQuestSession | null) {
-  if (!session) {
-    return {
-      available: false,
-      questionCount: 0,
-      quest: null,
-    };
-  }
-
-  return {
-    available: true,
-    questionCount: session.questionCount,
-    quest: session.quest,
   };
 }
