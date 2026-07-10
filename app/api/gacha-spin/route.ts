@@ -2,6 +2,8 @@ import { createClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { GACHA_SPIN_COST_PT } from "@/lib/gachaConstants";
+import { appendOwnedCard } from "@/lib/ownedCardsDb";
+
 const TOTAL_CARD_COUNT = 99;
 
 export const runtime = "nodejs";
@@ -96,6 +98,7 @@ export async function POST() {
     typeof data === "number" && Number.isFinite(data) ? Math.max(0, Math.floor(data)) : 0;
 
   const cardNo = Math.floor(Math.random() * TOTAL_CARD_COUNT) + 1;
+  await appendOwnedCard(supabase, studentId, cardNo).catch(() => null);
 
   return NextResponse.json({ gachaPoints: balance, cardNo });
 }

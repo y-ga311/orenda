@@ -172,34 +172,6 @@ type CollectionCard = {
   image: StaticImageData;
 };
 
-function localCardKey(studentId: string) {
-  return `orenda_cards_${studentId}`;
-}
-
-function loadOwnedCardNos(studentId: string): number[] {
-  if (!studentId || typeof window === "undefined") return [];
-  try {
-    const raw = localStorage.getItem(localCardKey(studentId));
-    if (!raw) return [];
-    const parsed: unknown = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
-    return (parsed as unknown[])
-      .filter((n): n is number => typeof n === "number" && Number.isInteger(n) && n >= 1 && n <= TOTAL_CARD_COUNT)
-      .filter((n, i, arr) => arr.indexOf(n) === i)
-      .sort((a, b) => a - b);
-  } catch {
-    return [];
-  }
-}
-
-function saveOwnedCardNos(studentId: string, nos: number[]): void {
-  if (!studentId || typeof window === "undefined") return;
-  try {
-    localStorage.setItem(localCardKey(studentId), JSON.stringify(nos));
-  } catch {
-    // ignore QuotaExceededError etc.
-  }
-}
 
 type AchievementMedalEntry = StudentMedalItem & {
   image: StaticImageData;
@@ -548,7 +520,6 @@ export function HomeScreen() {
     "timer",
   );
   const [selectedSubject, setSelectedSubject] = useState<StudySubject | null>(null);
-  const [currentStudentId, setCurrentStudentId] = useState("");
   const [selectedCollectionCard, setSelectedCollectionCard] = useState<CollectionCard | null>(null);
   const [gachaResultCard, setGachaResultCard] = useState<CollectionCard | null>(null);
   const [pendingGachaCardNo, setPendingGachaCardNo] = useState<number | null>(null);
@@ -775,6 +746,38 @@ export function HomeScreen() {
     void loadMedals();
   }, [activeScreen, isLoggedInPreview, loadMedals]);
 
+  useEffect(() => {
+    if (!isLoggedInPreview || activeScreen !== "collection") {
+      return;
+    }
+
+    let cancelled = false;
+    setIsCollectionLoading(true);
+
+    fetch("/api/collection")
+      .then((res) => (res.ok ? res.json() : Promise.reject()))
+      .then((data: { ownedCardNos?: unknown }) => {
+        if (cancelled) return;
+        if (Array.isArray(data?.ownedCardNos)) {
+          const nos = (data.ownedCardNos as unknown[])
+            .filter(
+              (n): n is number =>
+                typeof n === "number" && Number.isInteger(n) && n >= 1 && n <= TOTAL_CARD_COUNT,
+            )
+            .sort((a, b) => a - b);
+          setOwnedCardNos(nos);
+        }
+      })
+      .catch(() => null)
+      .finally(() => {
+        if (!cancelled) setIsCollectionLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeScreen, isLoggedInPreview]);
+
 
   useEffect(() => {
     if (!isLoggedInPreview || activeScreen !== "record") {
@@ -914,7 +917,6 @@ export function HomeScreen() {
 
     const result = (await response.json().catch(() => null)) as {
       student?: {
-        gakuseiId?: string | null;
         avatarIconId?: AvatarIconId | null;
         daysUntilExam?: number | null;
         dailyLoginBonusAwarded?: boolean;
@@ -931,9 +933,6 @@ export function HomeScreen() {
       result?.student?.dailyLoginBonusPoints,
     );
 
-    const studentId = result?.student?.gakuseiId ?? "";
-    setCurrentStudentId(studentId);
-    setOwnedCardNos(loadOwnedCardNos(studentId));
     setStudentName(result?.student?.name ?? "");
     setNickname(result?.student?.nickname ?? "");
     setDaysUntilExam(result?.student?.daysUntilExam ?? null);
@@ -1093,7 +1092,6 @@ export function HomeScreen() {
     setActiveScreen("menu");
     setSelectedSubject(null);
     setSelectedCollectionCard(null);
-    setCurrentStudentId("");
     setGachaResultCard(null);
     setPendingGachaCardNo(null);
     setOwnedCardNos([]);
@@ -1587,16 +1585,9 @@ export function HomeScreen() {
       const image = getCardImage(cardNo);
       if (image) {
         setGachaResultCard({ cardNo, image });
-        setCurrentStudentId((sid) => {
-          setOwnedCardNos((current) => {
-            const next = current.includes(cardNo)
-              ? current
-              : [...current, cardNo].sort((a, b) => a - b);
-            saveOwnedCardNos(sid, next);
-            return next;
-          });
-          return sid;
-        });
+        setOwnedCardNos((current) =>
+          current.includes(cardNo) ? current : [...current, cardNo].sort((a, b) => a - b),
+        );
       }
       return null;
     });
@@ -3885,7 +3876,9 @@ export function HomeScreen() {
                 className="collectionGrid"
                 aria-label="カード一覧"
               >
-                {Array.from({ length: TOTAL_CARD_COUNT }, (_, i) => i + 1).map((cardNo) => {
+                {isCollectionLoading ? (
+                  <p className="medalLoadingNote">読み込み中...</p>
+                ) : Array.from({ length: TOTAL_CARD_COUNT }, (_, i) => i + 1).map((cardNo) => {
                     const owned = ownedCardNos.includes(cardNo);
                     const image = owned ? getCardImage(cardNo) : null;
                     return owned && image ? (
