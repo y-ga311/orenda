@@ -2,6 +2,7 @@ import { createClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { GACHA_SPIN_COST_PT } from "@/lib/gachaConstants";
+const TOTAL_CARD_COUNT = 99;
 
 export const runtime = "nodejs";
 
@@ -94,5 +95,7 @@ export async function POST() {
   const balance =
     typeof data === "number" && Number.isFinite(data) ? Math.max(0, Math.floor(data)) : 0;
 
-  return NextResponse.json({ gachaPoints: balance });
+  const cardNo = Math.floor(Math.random() * TOTAL_CARD_COUNT) + 1;
+
+  return NextResponse.json({ gachaPoints: balance, cardNo });
 }

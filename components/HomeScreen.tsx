@@ -8,33 +8,20 @@ import characterImage from "@/source-images/character01.png";
 import reviewQuestImage from "@/source-images/018.png";
 import logoImage from "@/source-images/logo01.png";
 import byouriImage from "@/source-images/byouri.png";
-import byouriCardImage from "@/source-images/byouri_card.png";
 import eiseiImage from "@/source-images/eisei.png";
-import eiseiCardImage from "@/source-images/eisei_card.png";
 import hariImage from "@/source-images/hari.png";
-import hariCardImage from "@/source-images/hari_card.png";
 import iryogaironImage from "@/source-images/iryogairon.png";
-import iryogaironCardImage from "@/source-images/iryogairon_card.png";
 import kaibouImage from "@/source-images/kaibou.png";
-import kaibouCardImage from "@/source-images/kaibou_card.png";
 import kakuronImage from "@/source-images/kakuron.png";
-import kakuronCardImage from "@/source-images/kakuron_card.png";
 import kankeihoukiImage from "@/source-images/kankeihouki.png";
-import kankeihoukiCardImage from "@/source-images/kankeihouki_card.png";
 import keiketuImage from "@/source-images/keiketu.png";
-import keiketuCardImage from "@/source-images/keiketu_card.png";
 import kyuImage from "@/source-images/kyu.png";
-import kyuCardImage from "@/source-images/kyu_card.png";
 import rehaImage from "@/source-images/reha.png";
-import rehaCardImage from "@/source-images/reha_card.png";
 import seiriImage from "@/source-images/seiri.png";
-import seiriCardImage from "@/source-images/seiri_card.png";
 import souronImage from "@/source-images/souron.png";
-import souronCardImage from "@/source-images/souron_card.png";
 import tougaiImage from "@/source-images/tougai.png";
-import tougaiCardImage from "@/source-images/tougai_card.png";
 import tourinImage from "@/source-images/tourin.png";
-import tourinCardImage from "@/source-images/tourin_card.png";
+import { getCardImage, TOTAL_CARD_COUNT } from "@/lib/cardImages";
 import { avatarIcons, getAvatarIcon, type AvatarIconId } from "@/lib/avatarIcons";
 import { GACHA_POINTS_PER_TEACHER_QUEST_CORRECT, GACHA_SPIN_COST_PT } from "@/lib/gachaConstants";
 import type { StudentMedalItem } from "@/lib/medalDb";
@@ -105,8 +92,8 @@ const menuItems = [
   },
   {
     icon: "🎴",
-    title: "勉強カード",
-    description: "カードを集める・コレクションする",
+    title: "コレクション",
+    description: "カード・メダルを集める",
     tone: "gold",
   },
   {
@@ -180,22 +167,39 @@ const studySubjects = [
   },
 ];
 
-const collectionCards = [
-  { title: "解剖学", image: kaibouCardImage },
-  { title: "生理学", image: seiriCardImage },
-  { title: "病理学概論", image: byouriCardImage },
-  { title: "臨床医学総論", image: souronCardImage },
-  { title: "臨床医学各論", image: kakuronCardImage },
-  { title: "リハビリテーション医学", image: rehaCardImage },
-  { title: "東洋医学概論", image: tougaiCardImage },
-  { title: "経絡経穴概論", image: keiketuCardImage },
-  { title: "東洋医学臨床論", image: tourinCardImage },
-  { title: "はり理論", image: hariCardImage },
-  { title: "きゅう理論", image: kyuCardImage },
-  { title: "医療概論", image: iryogaironCardImage },
-  { title: "衛生学", image: eiseiCardImage },
-  { title: "関係法規", image: kankeihoukiCardImage },
-];
+type CollectionCard = {
+  cardNo: number;
+  image: StaticImageData;
+};
+
+function localCardKey(studentId: string) {
+  return `orenda_cards_${studentId}`;
+}
+
+function loadOwnedCardNos(studentId: string): number[] {
+  if (!studentId || typeof window === "undefined") return [];
+  try {
+    const raw = localStorage.getItem(localCardKey(studentId));
+    if (!raw) return [];
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return (parsed as unknown[])
+      .filter((n): n is number => typeof n === "number" && Number.isInteger(n) && n >= 1 && n <= TOTAL_CARD_COUNT)
+      .filter((n, i, arr) => arr.indexOf(n) === i)
+      .sort((a, b) => a - b);
+  } catch {
+    return [];
+  }
+}
+
+function saveOwnedCardNos(studentId: string, nos: number[]): void {
+  if (!studentId || typeof window === "undefined") return;
+  try {
+    localStorage.setItem(localCardKey(studentId), JSON.stringify(nos));
+  } catch {
+    // ignore QuotaExceededError etc.
+  }
+}
 
 type AchievementMedalEntry = StudentMedalItem & {
   image: StaticImageData;
@@ -544,12 +548,12 @@ export function HomeScreen() {
     "timer",
   );
   const [selectedSubject, setSelectedSubject] = useState<StudySubject | null>(null);
-  const [selectedCollectionCard, setSelectedCollectionCard] = useState<
-    (typeof collectionCards)[number] | null
-  >(null);
-  const [gachaResultCard, setGachaResultCard] = useState<
-    (typeof collectionCards)[number] | null
-  >(null);
+  const [currentStudentId, setCurrentStudentId] = useState("");
+  const [selectedCollectionCard, setSelectedCollectionCard] = useState<CollectionCard | null>(null);
+  const [gachaResultCard, setGachaResultCard] = useState<CollectionCard | null>(null);
+  const [pendingGachaCardNo, setPendingGachaCardNo] = useState<number | null>(null);
+  const [ownedCardNos, setOwnedCardNos] = useState<number[]>([]);
+  const [isCollectionLoading, setIsCollectionLoading] = useState(false);
   const [isGachaPlaying, setIsGachaPlaying] = useState(false);
   const [gachaVideoKey, setGachaVideoKey] = useState(0);
   const gachaVideoEndedRef = useRef(false);
@@ -771,6 +775,7 @@ export function HomeScreen() {
     void loadMedals();
   }, [activeScreen, isLoggedInPreview, loadMedals]);
 
+
   useEffect(() => {
     if (!isLoggedInPreview || activeScreen !== "record") {
       return;
@@ -909,6 +914,7 @@ export function HomeScreen() {
 
     const result = (await response.json().catch(() => null)) as {
       student?: {
+        gakuseiId?: string | null;
         avatarIconId?: AvatarIconId | null;
         daysUntilExam?: number | null;
         dailyLoginBonusAwarded?: boolean;
@@ -925,6 +931,9 @@ export function HomeScreen() {
       result?.student?.dailyLoginBonusPoints,
     );
 
+    const studentId = result?.student?.gakuseiId ?? "";
+    setCurrentStudentId(studentId);
+    setOwnedCardNos(loadOwnedCardNos(studentId));
     setStudentName(result?.student?.name ?? "");
     setNickname(result?.student?.nickname ?? "");
     setDaysUntilExam(result?.student?.daysUntilExam ?? null);
@@ -1084,7 +1093,11 @@ export function HomeScreen() {
     setActiveScreen("menu");
     setSelectedSubject(null);
     setSelectedCollectionCard(null);
+    setCurrentStudentId("");
     setGachaResultCard(null);
+    setPendingGachaCardNo(null);
+    setOwnedCardNos([]);
+    setIsCollectionLoading(false);
     setIsGachaPlaying(false);
     setGachaVideoKey(0);
     setAchievementMedals([]);
@@ -1567,13 +1580,26 @@ export function HomeScreen() {
     }
 
     gachaVideoEndedRef.current = true;
-
-    const nextCard =
-      collectionCards[Math.floor(Math.random() * collectionCards.length)] ??
-      collectionCards[0];
-
     setIsGachaPlaying(false);
-    setGachaResultCard(nextCard);
+
+    setPendingGachaCardNo((prev) => {
+      const cardNo = prev ?? (Math.floor(Math.random() * TOTAL_CARD_COUNT) + 1);
+      const image = getCardImage(cardNo);
+      if (image) {
+        setGachaResultCard({ cardNo, image });
+        setCurrentStudentId((sid) => {
+          setOwnedCardNos((current) => {
+            const next = current.includes(cardNo)
+              ? current
+              : [...current, cardNo].sort((a, b) => a - b);
+            saveOwnedCardNos(sid, next);
+            return next;
+          });
+          return sid;
+        });
+      }
+      return null;
+    });
   }, []);
 
   const startGachaDraw = useCallback(async () => {
@@ -1599,9 +1625,19 @@ export function HomeScreen() {
 
       const payload = (await response.json().catch(() => null)) as {
         gachaPoints?: unknown;
+        cardNo?: unknown;
       } | null;
 
       setGachaPoints(normalizeGachaPoints(payload?.gachaPoints));
+
+      const receivedCardNo =
+        typeof payload?.cardNo === "number" &&
+        Number.isInteger(payload.cardNo) &&
+        payload.cardNo >= 1 &&
+        payload.cardNo <= TOTAL_CARD_COUNT
+          ? payload.cardNo
+          : null;
+      setPendingGachaCardNo(receivedCardNo);
 
       gachaVideoEndedRef.current = false;
       setGachaResultCard(null);
@@ -3581,14 +3617,14 @@ export function HomeScreen() {
                       <div className="gachaResultCardWrap">
                         <Image
                           src={gachaResultCard.image}
-                          alt={gachaResultCard.title}
+                          alt={`カード No.${gachaResultCard.cardNo}`}
                           className="gachaResultCard"
                           fill
                           sizes="(max-width: 430px) 72vw, 280px"
                           priority
                         />
                       </div>
-                      <strong className="gachaResultTitle">{gachaResultCard.title}</strong>
+                      <strong className="gachaResultTitle">カード No.{gachaResultCard.cardNo}</strong>
                     </div>
                   ) : (
                     <div className="gachaMachineIdle">
@@ -3785,11 +3821,6 @@ export function HomeScreen() {
   }
 
   if (isLoggedInPreview && activeScreen === "collection") {
-    const cardSlots = Array.from({ length: 99 }, (_, index) => {
-      return collectionCards[index]
-        ? { ...collectionCards[index], slotNumber: index + 1, isOwned: true }
-        : { title: "", image: null, slotNumber: index + 1, isOwned: false };
-    });
 
     return (
       <main className="appShell">
@@ -3845,8 +3876,8 @@ export function HomeScreen() {
 
               <div className="collectionSummary">
                 <span className="collectionSummaryIcon" aria-hidden="true">▣</span>
-                <strong>すべてのカード</strong>
-                <small>{collectionCards.length}/99</small>
+                <strong>獲得カード</strong>
+                <small>{ownedCardNos.length}/99</small>
               </div>
 
               <section
@@ -3854,31 +3885,28 @@ export function HomeScreen() {
                 className="collectionGrid"
                 aria-label="カード一覧"
               >
-                {cardSlots.map((card) => (
-                  card.image ? (
-                    <button
-                      className="collectionCardSlot collectionCardSlotOwned"
-                      key={card.slotNumber}
-                      type="button"
-                      onClick={() =>
-                        setSelectedCollectionCard({
-                          title: card.title,
-                          image: card.image,
-                        })
-                      }
-                    >
-                      <Image
-                        src={card.image}
-                        alt={card.title}
-                        className="collectionCardImage"
-                      />
-                    </button>
-                  ) : (
-                    <div className="collectionCardSlot" key={card.slotNumber}>
-                      <span>{card.slotNumber}</span>
-                    </div>
-                  )
-                ))}
+                {Array.from({ length: TOTAL_CARD_COUNT }, (_, i) => i + 1).map((cardNo) => {
+                    const owned = ownedCardNos.includes(cardNo);
+                    const image = owned ? getCardImage(cardNo) : null;
+                    return owned && image ? (
+                      <button
+                        className="collectionCardSlot collectionCardSlotOwned"
+                        key={cardNo}
+                        type="button"
+                        onClick={() => setSelectedCollectionCard({ cardNo, image })}
+                      >
+                        <Image
+                          src={image}
+                          alt={`カード No.${cardNo}`}
+                          className="collectionCardImage"
+                        />
+                      </button>
+                    ) : (
+                      <div className="collectionCardSlot" key={cardNo}>
+                        <span>{cardNo}</span>
+                      </div>
+                    );
+                  })}
               </section>
             </section>
           </div>
@@ -3898,7 +3926,7 @@ export function HomeScreen() {
               className="collectionZoomOverlay"
               role="dialog"
               aria-modal="true"
-              aria-label={`${selectedCollectionCard.title} のカード詳細`}
+              aria-label={`カード No.${selectedCollectionCard.cardNo} の詳細`}
               onClick={() => setSelectedCollectionCard(null)}
             >
               <div
@@ -3908,7 +3936,7 @@ export function HomeScreen() {
               >
                 <Image
                   src={selectedCollectionCard.image}
-                  alt={selectedCollectionCard.title}
+                  alt={`カード No.${selectedCollectionCard.cardNo}`}
                   className="collectionZoomImage"
                   priority
                 />
@@ -3974,7 +4002,7 @@ export function HomeScreen() {
                     setActiveScreen("record");
                   }
 
-                  if (item.title === "勉強カード") {
+                  if (item.title === "コレクション") {
                     setActiveScreen("collection");
                   }
 
