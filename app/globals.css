@@ -3574,6 +3574,9 @@ button {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  height: min(calc(100svh - 24px), 844px);
+  max-height: min(calc(100svh - 24px), 844px);
+  background: linear-gradient(135deg, #e0f5ec 0%, #e8eef8 50%, #f8e8f0 100%);
 }
 
 .selfCheckHeader {

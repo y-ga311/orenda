@@ -309,7 +309,6 @@ export function SelfCheckScreen({ onComplete }: Props) {
           {/* イントロ */}
           {section === "intro" && (
             <div className="selfCheckIntro">
-              <div className="selfCheckIntroIcon" aria-hidden="true">🧠</div>
               <h2>今月のセルフチェックを始めましょう</h2>
               <p>
                 心身の健康状態を確認するための4つの質問票です。<br />
@@ -321,9 +320,6 @@ export function SelfCheckScreen({ onComplete }: Props) {
                 <li>③ 睡眠チェック（PSQI簡易版）</li>
                 <li>④ レジリエンス指標</li>
               </ul>
-              <p className="selfCheckIntroDisclaimer">
-                回答は担任の先生が確認します。医療診断ではありません。
-              </p>
               <button
                 type="button"
                 className="selfCheckStartButton"

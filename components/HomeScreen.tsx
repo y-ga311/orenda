@@ -492,12 +492,16 @@ export function HomeScreen() {
   const [questSelectDataVersion, setQuestSelectDataVersion] = useState(0);
   const questSelectDataRequestRef = useRef(0);
   const [message, setMessage] = useState("");
-  const [loginSuccessNotice, setLoginSuccessNotice] = useState<{
+  type LoginSuccessNoticeData = {
     dailyBonusAwarded: boolean;
     dailyBonusPoints: number;
     gachaPoints: number;
     displayName: string;
-  } | null>(null);
+  };
+  const [loginSuccessNotice, setLoginSuccessNotice] =
+    useState<LoginSuccessNoticeData | null>(null);
+  const [pendingLoginSuccessNotice, setPendingLoginSuccessNotice] =
+    useState<LoginSuccessNoticeData | null>(null);
   const [profileMessage, setProfileMessage] = useState("");
   const [myPageTab, setMyPageTab] = useState<"edit" | "type">("edit");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -968,15 +972,23 @@ export function HomeScreen() {
     setPassword("");
     setMessage("");
 
+    const noticeData: LoginSuccessNoticeData = {
+      displayName: result?.student?.nickname || result?.student?.name || "",
+      gachaPoints,
+      dailyBonusAwarded: dailyLoginBonusAwarded,
+      dailyBonusPoints: dailyLoginBonusPoints,
+    };
+
     if (!needsProfileSetupNext && !needsSelfCheckNext) {
-      setLoginSuccessNotice({
-        displayName: result?.student?.nickname || result?.student?.name || "",
-        gachaPoints,
-        dailyBonusAwarded: dailyLoginBonusAwarded,
-        dailyBonusPoints: dailyLoginBonusPoints,
-      });
+      setLoginSuccessNotice(noticeData);
+      setPendingLoginSuccessNotice(null);
+    } else if (needsSelfCheckNext && !needsProfileSetupNext) {
+      // セルフチェック完了後に表示するため一時保存
+      setPendingLoginSuccessNotice(noticeData);
+      setLoginSuccessNotice(null);
     } else {
       setLoginSuccessNotice(null);
+      setPendingLoginSuccessNotice(null);
     }
   }
 
@@ -1044,17 +1056,21 @@ export function HomeScreen() {
         result?.student?.dailyLoginBonusPoints,
       );
 
+      const profileNoticeData: LoginSuccessNoticeData = {
+        displayName: result?.student?.nickname ?? nickname,
+        gachaPoints: normalizeGachaPoints(result?.student?.gachaPoints ?? gachaPoints),
+        dailyBonusAwarded: Boolean(result?.student?.dailyLoginBonusAwarded),
+        dailyBonusPoints: dailyLoginBonusPoints,
+      };
+
       if (needsSelfCheck) {
         setActiveScreen("selfCheck");
+        setPendingLoginSuccessNotice(profileNoticeData);
         setLoginSuccessNotice(null);
       } else {
         setActiveScreen("menu");
-        setLoginSuccessNotice({
-          displayName: result?.student?.nickname ?? nickname,
-          gachaPoints: normalizeGachaPoints(result?.student?.gachaPoints ?? gachaPoints),
-          dailyBonusAwarded: Boolean(result?.student?.dailyLoginBonusAwarded),
-          dailyBonusPoints: dailyLoginBonusPoints,
-        });
+        setLoginSuccessNotice(profileNoticeData);
+        setPendingLoginSuccessNotice(null);
       }
     }
   }
@@ -1129,6 +1145,7 @@ export function HomeScreen() {
     setMyPageTab("edit");
     setIsLoginOpen(false);
     setLoginSuccessNotice(null);
+    setPendingLoginSuccessNotice(null);
     setLoginId("");
     setPassword("");
     setStudentName("");
@@ -3840,6 +3857,10 @@ export function HomeScreen() {
         onComplete={() => {
           setNeedsSelfCheck(false);
           setActiveScreen("menu");
+          if (pendingLoginSuccessNotice) {
+            setLoginSuccessNotice(pendingLoginSuccessNotice);
+            setPendingLoginSuccessNotice(null);
+          }
         }}
       />
     );
