@@ -151,6 +151,24 @@ export async function POST(request: Request) {
     }
   }
 
+  // 今月のセルフチェック済みか確認
+  const { year, month } = getJapanDateParts();
+  const currentYearMonth = `${year}-${String(month).padStart(2, "0")}`;
+  let needsSelfCheck = false;
+
+  if (!needsProfileSetup) {
+    const { data: existingCheck, error: selfCheckError } = await supabase
+      .from("student_self_checks")
+      .select("id")
+      .eq("gakusei_id", data.gakusei_id)
+      .eq("year_month", currentYearMonth)
+      .maybeSingle();
+
+    if (!selfCheckError) {
+      needsSelfCheck = !existingCheck;
+    }
+  }
+
   const response = NextResponse.json({
     student: {
       gakuseiId: data.gakusei_id,
@@ -165,6 +183,7 @@ export async function POST(request: Request) {
       dailyLoginBonusAwarded: loginProcess.dailyBonusAwarded,
       dailyLoginBonusPoints: loginProcess.dailyBonusPoints,
       needsProfileSetup,
+      needsSelfCheck,
       examDate,
       daysUntilExam: examDate ? getDaysUntilExam(examDate) : null,
     },
