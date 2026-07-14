@@ -75,44 +75,10 @@ const RESILIENCE_OPTIONS = [
   { label: "とてもそう思う", score: 5 },
 ] as const;
 
-// ─── 判定ヘルパー ─────────────────────────────────────────────────────────────
-
-function phq9Level(score: number) {
-  if (score <= 4) return { label: "良好", note: "引き続き心の健康を大切に", color: "good" };
-  if (score <= 9) return { label: "注意", note: "セルフケアを心がけましょう", color: "caution" };
-  if (score <= 14) return { label: "要注意", note: "信頼できる人や相談窓口に話してみましょう", color: "warning" };
-  return { label: "要注意", note: "専門家への相談をお勧めします", color: "danger" };
-}
-
-function gad7Level(score: number) {
-  if (score <= 4) return { label: "良好", note: "不安は落ち着いた状態です", color: "good" };
-  if (score <= 9) return { label: "注意", note: "気になることを誰かに話してみましょう", color: "caution" };
-  if (score <= 14) return { label: "要注意", note: "相談窓口を活用してみましょう", color: "warning" };
-  return { label: "要注意", note: "専門家への相談をお勧めします", color: "danger" };
-}
-
-function psqiLevel(score: number) {
-  if (score <= 4) return { label: "良好", note: "良質な睡眠が取れています", color: "good" };
-  if (score <= 9) return { label: "注意", note: "睡眠の質がやや低下しています", color: "caution" };
-  return { label: "要注意", note: "睡眠の質に問題がある可能性があります", color: "warning" };
-}
-
-function resilienceLevel(score: number) {
-  if (score >= 33) return { label: "高い", note: "高いレジリエンスを持っています", color: "good" };
-  if (score >= 24) return { label: "中程度", note: "平均的なレジリエンスです", color: "caution" };
-  return { label: "向上の余地あり", note: "日々の実践でレジリエンスを高めましょう", color: "warning" };
-}
 
 // ─── 型定義 ───────────────────────────────────────────────────────────────────
 
-type SelfCheckSection = "intro" | "phq9" | "gad7" | "psqi" | "resilience" | "done" | "emergency";
-
-type Scores = {
-  phq9: number;
-  gad7: number;
-  psqi: number;
-  resilience: number;
-};
+type SelfCheckSection = "intro" | "phq9" | "gad7" | "psqi" | "resilience";
 
 type Props = {
   onComplete: () => void;
@@ -122,7 +88,7 @@ const SECTION_ORDER: SelfCheckSection[] = ["intro", "phq9", "gad7", "psqi", "res
 
 function progressStep(section: SelfCheckSection): number {
   const map: Record<SelfCheckSection, number> = {
-    intro: 0, phq9: 1, gad7: 2, psqi: 3, resilience: 4, done: 4, emergency: 4,
+    intro: 0, phq9: 1, gad7: 2, psqi: 3, resilience: 4,
   };
   return map[section];
 }
@@ -137,7 +103,6 @@ export function SelfCheckScreen({ onComplete }: Props) {
   const [resAns, setResAns] = useState<(number | null)[]>(Array(8).fill(null));
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
-  const [scores, setScores] = useState<Scores | null>(null);
 
   const allPhq9Done = phq9Ans.every((a) => a !== null);
   const allGad7Done = gad7Ans.every((a) => a !== null);
@@ -186,17 +151,7 @@ export function SelfCheckScreen({ onComplete }: Props) {
         resilienceScore?: number;
       } | null;
 
-      const finalScores: Scores = {
-        phq9: data?.phq9Score ?? 0,
-        gad7: data?.gad7Score ?? 0,
-        psqi: data?.psqiScore ?? 0,
-        resilience: data?.resilienceScore ?? 0,
-      };
-      setScores(finalScores);
-
-      // PHQ-9 Q9（希死念慮）が「数日」以上の場合は緊急サポート画面へ
-      const phq9Q9 = phq9Ans[8] ?? 0;
-      setSection(phq9Q9 >= 1 ? "emergency" : "done");
+      onComplete();
     } finally {
       setIsSubmitting(false);
     }
@@ -204,7 +159,7 @@ export function SelfCheckScreen({ onComplete }: Props) {
 
   // ── 進捗バー ──────────────────────────────────────────────────────────────
   const step = progressStep(section);
-  const showProgress = section !== "intro" && section !== "done" && section !== "emergency";
+  const showProgress = section !== "intro";
 
   // ── 設問リスト共通レンダラー ─────────────────────────────────────────────
   function renderQuestions(
@@ -320,17 +275,6 @@ export function SelfCheckScreen({ onComplete }: Props) {
           </button>
         </div>
       </>
-    );
-  }
-
-  // ── 結果サマリー共通 ─────────────────────────────────────────────────────
-  function renderResultBadge(label: string, score: string | number, level: { label: string; color: string }) {
-    return (
-      <div className={`selfCheckResultItem selfCheckResultItem-${level.color}`}>
-        <span className="selfCheckResultLabel">{label}</span>
-        <span className="selfCheckResultScore">{score}点</span>
-        <span className="selfCheckResultBadge">{level.label}</span>
-      </div>
     );
   }
 
@@ -467,79 +411,6 @@ export function SelfCheckScreen({ onComplete }: Props) {
             </>
           )}
 
-          {/* 完了 */}
-          {section === "done" && scores && (
-            <div className="selfCheckDone">
-              <div className="selfCheckDoneIcon" aria-hidden="true">✅</div>
-              <h2>セルフチェック完了！</h2>
-              <p className="selfCheckDoneNote">今月の結果です。担任の先生が確認します。</p>
-
-              <div className="selfCheckResults">
-                {renderResultBadge("うつ症状", scores.phq9, phq9Level(scores.phq9))}
-                {renderResultBadge("不安症状", scores.gad7, gad7Level(scores.gad7))}
-                {renderResultBadge("睡眠の質", scores.psqi, psqiLevel(scores.psqi))}
-                {renderResultBadge("レジリエンス", scores.resilience, resilienceLevel(scores.resilience))}
-              </div>
-
-              <p className="selfCheckDoneDisclaimer">
-                ※ これはあくまで参考です。気になることがあれば学生相談室や担任の先生にご相談ください。
-              </p>
-
-              <button
-                type="button"
-                className="selfCheckStartButton"
-                onClick={onComplete}
-              >
-                メインメニューへ
-              </button>
-            </div>
-          )}
-
-          {/* 緊急サポート（PHQ-9 Q9 ≥ 1） */}
-          {section === "emergency" && (
-            <div className="selfCheckEmergency">
-              <div className="selfCheckEmergencyIcon" aria-hidden="true">💙</div>
-              <h2>あなたのことが心配です</h2>
-              <p>
-                回答の中に、つらい気持ちが含まれていました。<br />
-                一人で抱え込まず、誰かに話してみてください。
-              </p>
-
-              <div className="selfCheckHelplines">
-                <h3>相談できる窓口</h3>
-                <a className="selfCheckHelpline" href="tel:0120279338">
-                  <span className="selfCheckHelplineName">よりそいホットライン</span>
-                  <span className="selfCheckHelplinePhone">0120-279-338</span>
-                  <span className="selfCheckHelplineHours">24時間365日</span>
-                </a>
-                <a className="selfCheckHelpline" href="tel:0570064556">
-                  <span className="selfCheckHelplineName">こころの健康相談統一ダイヤル</span>
-                  <span className="selfCheckHelplinePhone">0570-064-556</span>
-                  <span className="selfCheckHelplineHours">都道府県により異なる</span>
-                </a>
-                <a className="selfCheckHelpline" href="tel:0120783556">
-                  <span className="selfCheckHelplineName">いのちの電話</span>
-                  <span className="selfCheckHelplinePhone">0120-783-556</span>
-                  <span className="selfCheckHelplineHours">毎日16〜21時ほか</span>
-                </a>
-              </div>
-
-              {scores && (
-                <div className="selfCheckResults selfCheckResultsSmall">
-                  {renderResultBadge("うつ症状", scores.phq9, phq9Level(scores.phq9))}
-                  {renderResultBadge("不安症状", scores.gad7, gad7Level(scores.gad7))}
-                </div>
-              )}
-
-              <button
-                type="button"
-                className="selfCheckStartButton selfCheckStartButtonSecondary"
-                onClick={onComplete}
-              >
-                メインメニューへ
-              </button>
-            </div>
-          )}
         </div>
       </section>
     </main>
