@@ -1,5 +1,10 @@
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
+import {
+  DEFAULT_CLASS_APP_FEATURES,
+  parseClassAppFeatures,
+  type ClassAppFeatures,
+} from "@/lib/classAppFeatures";
 import { getJapanDateParts } from "@/lib/japanDate";
 import { normalizeGachaPoints } from "@/lib/normalizeGachaPoints";
 import { parseStudyTypeId } from "@/lib/studyTypeIds";
@@ -130,7 +135,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const className = typeof data.class === "string" ? data.class : null;
+  const className = typeof data.class === "string" ? data.class.trim() || null : null;
 
   /** 複数アクティブ行があるとき maybeSingle が失敗してログイン全体が落ちるのを避け、日程はベストエフォートとする */
   let examDate: string | null = null;
@@ -151,6 +156,22 @@ export async function POST(request: Request) {
     }
   }
 
+  let appFeatures: ClassAppFeatures = { ...DEFAULT_CLASS_APP_FEATURES };
+  if (className) {
+    const { data: featureRow, error: featureError } = await supabase
+      .from("class_app_features")
+      .select("features")
+      .eq("class_name", className)
+      .maybeSingle();
+
+    if (featureError) {
+      // テーブル未作成時もログインを止めない（デフォルト全ON）
+      console.error("[login] class_app_features:", featureError.message);
+    } else if (featureRow?.features != null) {
+      appFeatures = parseClassAppFeatures(featureRow.features);
+    }
+  }
+
   const response = NextResponse.json({
     student: {
       gakuseiId: data.gakusei_id,
@@ -167,6 +188,7 @@ export async function POST(request: Request) {
       needsProfileSetup,
       examDate,
       daysUntilExam: examDate ? getDaysUntilExam(examDate) : null,
+      appFeatures,
     },
   });
 

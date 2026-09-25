@@ -49,6 +49,14 @@ import {
 } from "@/lib/questSubcategories";
 import { getStudyType, studyTypes } from "@/lib/studyTypes";
 import { parseStudyTypeId, type StudyTypeId } from "@/lib/studyTypeIds";
+import {
+  DEFAULT_CLASS_APP_FEATURES,
+  MENU_FEATURE_BY_TITLE,
+  isScreenEnabled,
+  parseClassAppFeatures,
+  type AppScreenForFeature,
+  type ClassAppFeatures,
+} from "@/lib/classAppFeatures";
 import { TimerBottomNav } from "@/components/TimerBottomNav";
 import {
   TeacherQuestBattleScreen,
@@ -503,6 +511,9 @@ export function HomeScreen() {
   const [isProfileSubmitting, setIsProfileSubmitting] = useState(false);
   const [isLoggedInPreview, setIsLoggedInPreview] = useState(false);
   const [needsProfileSetup, setNeedsProfileSetup] = useState(false);
+  const [appFeatures, setAppFeatures] = useState<ClassAppFeatures>(
+    DEFAULT_CLASS_APP_FEATURES,
+  );
   const [showPassword, setShowPassword] = useState(false);
   const [activeScreen, setActiveScreen] = useState<
     | "menu"
@@ -583,6 +594,16 @@ export function HomeScreen() {
       body.style.touchAction = previousBodyTouchAction;
     };
   }, [selectedCollectionCard]);
+
+  useEffect(() => {
+    if (!isLoggedInPreview || activeScreen === "menu") {
+      return;
+    }
+
+    if (!isScreenEnabled(appFeatures, activeScreen as AppScreenForFeature)) {
+      setActiveScreen("menu");
+    }
+  }, [activeScreen, appFeatures, isLoggedInPreview]);
 
   useEffect(() => {
     if (!isLoggedInPreview || activeScreen !== "timer") {
@@ -917,6 +938,7 @@ export function HomeScreen() {
 
     const result = (await response.json().catch(() => null)) as {
       student?: {
+        appFeatures?: unknown;
         avatarIconId?: AvatarIconId | null;
         daysUntilExam?: number | null;
         dailyLoginBonusAwarded?: boolean;
@@ -939,6 +961,7 @@ export function HomeScreen() {
     setSelectedAvatarIconId(result?.student?.avatarIconId ?? "pixel01");
     setStudyTypeId(parseStudyTypeId(result?.student?.studyTypeId));
     setPendingStudyTypeId(parseStudyTypeId(result?.student?.studyTypeId));
+    setAppFeatures(parseClassAppFeatures(result?.student?.appFeatures));
     const gachaPoints = normalizeGachaPoints(result?.student?.gachaPoints);
     const dailyLoginBonusAwarded = Boolean(result?.student?.dailyLoginBonusAwarded);
 
@@ -1091,6 +1114,7 @@ export function HomeScreen() {
 
     setIsLoggedInPreview(false);
     setActiveScreen("menu");
+    setAppFeatures(DEFAULT_CLASS_APP_FEATURES);
     setSelectedSubject(null);
     setSelectedCollectionCard(null);
     setGachaResultCard(null);
@@ -1196,25 +1220,40 @@ export function HomeScreen() {
   }
 
   const navigateToTimer = useCallback(() => {
+    if (!isScreenEnabled(appFeatures, "timer")) {
+      return;
+    }
     setActiveScreen("timer");
-  }, []);
+  }, [appFeatures]);
 
   const navigateToQuest = useCallback(() => {
+    if (!isScreenEnabled(appFeatures, "quest")) {
+      return;
+    }
     resetQuestScreen();
     setActiveScreen("quest");
-  }, []);
+  }, [appFeatures]);
 
   const navigateToRecord = useCallback(() => {
+    if (!isScreenEnabled(appFeatures, "record")) {
+      return;
+    }
     setActiveScreen("record");
-  }, []);
+  }, [appFeatures]);
 
   const navigateToCollection = useCallback(() => {
+    if (!isScreenEnabled(appFeatures, "collection")) {
+      return;
+    }
     setActiveScreen("collection");
-  }, []);
+  }, [appFeatures]);
 
   const navigateToRanking = useCallback(() => {
+    if (!isScreenEnabled(appFeatures, "ranking")) {
+      return;
+    }
     setActiveScreen("ranking");
-  }, []);
+  }, [appFeatures]);
 
   async function openQuestSetup(subject: StudySubject) {
     setSelectedQuestSubject(subject);
@@ -2991,6 +3030,7 @@ export function HomeScreen() {
             onSelectRecord={navigateToRecord}
             onSelectCollection={navigateToCollection}
             onSelectRanking={navigateToRanking}
+            enabledFeatures={appFeatures}
           />
         </section>
       </main>
@@ -3076,6 +3116,7 @@ export function HomeScreen() {
             onSelectRecord={navigateToRecord}
             onSelectCollection={navigateToCollection}
             onSelectRanking={navigateToRanking}
+            enabledFeatures={appFeatures}
           />
         </section>
       </main>
@@ -3365,6 +3406,7 @@ export function HomeScreen() {
             onSelectRecord={navigateToRecord}
             onSelectCollection={navigateToCollection}
             onSelectRanking={navigateToRanking}
+            enabledFeatures={appFeatures}
           />
         </section>
       </main>
@@ -3523,6 +3565,7 @@ export function HomeScreen() {
             onSelectRecord={navigateToRecord}
             onSelectCollection={navigateToCollection}
             onSelectRanking={navigateToRanking}
+            enabledFeatures={appFeatures}
           />
         </section>
       </main>
@@ -3678,6 +3721,7 @@ export function HomeScreen() {
               onSelectRecord={navigateToRecord}
               onSelectCollection={navigateToCollection}
               onSelectRanking={navigateToRanking}
+              enabledFeatures={appFeatures}
             />
           ) : null}
         </section>
@@ -3806,6 +3850,7 @@ export function HomeScreen() {
             onSelectRecord={navigateToRecord}
             onSelectCollection={navigateToCollection}
             onSelectRanking={navigateToRanking}
+            enabledFeatures={appFeatures}
           />
         </section>
       </main>
@@ -3913,6 +3958,7 @@ export function HomeScreen() {
             onSelectRecord={navigateToRecord}
             onSelectCollection={navigateToCollection}
             onSelectRanking={navigateToRanking}
+            enabledFeatures={appFeatures}
           />
 
           {selectedCollectionCard ? (
@@ -3982,12 +4028,22 @@ export function HomeScreen() {
           </section>
 
           <nav className="menuList" aria-label="学習管理メニュー">
-            {menuItems.map((item) => (
+            {menuItems
+              .filter((item) => {
+                const featureKey = MENU_FEATURE_BY_TITLE[item.title];
+                return !featureKey || appFeatures[featureKey] !== false;
+              })
+              .map((item) => (
               <button
                 className="menuItem"
                 key={item.title}
                 type="button"
                 onClick={() => {
+                  const featureKey = MENU_FEATURE_BY_TITLE[item.title];
+                  if (featureKey && appFeatures[featureKey] === false) {
+                    return;
+                  }
+
                   if (item.title === "学習タイマー") {
                     setActiveScreen("timer");
                   }
