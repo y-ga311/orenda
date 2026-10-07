@@ -2,7 +2,10 @@ import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import {
   DEFAULT_CLASS_APP_FEATURES,
+  DEFAULT_MENU_ORDER,
   parseClassAppFeatures,
+  parseMenuOrder,
+  type ClassAppFeatureKey,
   type ClassAppFeatures,
 } from "@/lib/classAppFeatures";
 import { getJapanDateParts } from "@/lib/japanDate";
@@ -157,18 +160,42 @@ export async function POST(request: Request) {
   }
 
   let appFeatures: ClassAppFeatures = { ...DEFAULT_CLASS_APP_FEATURES };
+  let menuOrder: ClassAppFeatureKey[] = [...DEFAULT_MENU_ORDER];
   if (className) {
-    const { data: featureRow, error: featureError } = await supabase
+    let featureRow: { features?: unknown; menu_order?: unknown } | null = null;
+
+    const withOrder = await supabase
       .from("class_app_features")
-      .select("features")
+      .select("features, menu_order")
       .eq("class_name", className)
       .maybeSingle();
 
-    if (featureError) {
-      // テーブル未作成時もログインを止めない（デフォルト全ON）
-      console.error("[login] class_app_features:", featureError.message);
-    } else if (featureRow?.features != null) {
-      appFeatures = parseClassAppFeatures(featureRow.features);
+    if (withOrder.error) {
+      // menu_order 未追加などでも features だけは読む（ログインは止めない）
+      console.error("[login] class_app_features:", withOrder.error.message);
+      const featuresOnly = await supabase
+        .from("class_app_features")
+        .select("features")
+        .eq("class_name", className)
+        .maybeSingle();
+
+      if (featuresOnly.error) {
+        console.error(
+          "[login] class_app_features(features):",
+          featuresOnly.error.message,
+        );
+      } else {
+        featureRow = featuresOnly.data;
+      }
+    } else {
+      featureRow = withOrder.data;
+    }
+
+    if (featureRow) {
+      if (featureRow.features != null) {
+        appFeatures = parseClassAppFeatures(featureRow.features);
+      }
+      menuOrder = parseMenuOrder(featureRow.menu_order);
     }
   }
 
@@ -189,6 +216,7 @@ export async function POST(request: Request) {
       examDate,
       daysUntilExam: examDate ? getDaysUntilExam(examDate) : null,
       appFeatures,
+      menuOrder,
     },
   });
 

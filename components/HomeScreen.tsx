@@ -51,10 +51,14 @@ import { getStudyType, studyTypes } from "@/lib/studyTypes";
 import { parseStudyTypeId, type StudyTypeId } from "@/lib/studyTypeIds";
 import {
   DEFAULT_CLASS_APP_FEATURES,
+  DEFAULT_MENU_ORDER,
   MENU_FEATURE_BY_TITLE,
   isScreenEnabled,
   parseClassAppFeatures,
+  parseMenuOrder,
+  sortMenuItemsByOrder,
   type AppScreenForFeature,
+  type ClassAppFeatureKey,
   type ClassAppFeatures,
 } from "@/lib/classAppFeatures";
 import { TimerBottomNav } from "@/components/TimerBottomNav";
@@ -514,6 +518,9 @@ export function HomeScreen() {
   const [appFeatures, setAppFeatures] = useState<ClassAppFeatures>(
     DEFAULT_CLASS_APP_FEATURES,
   );
+  const [menuOrder, setMenuOrder] = useState<ClassAppFeatureKey[]>(
+    DEFAULT_MENU_ORDER,
+  );
   const [showPassword, setShowPassword] = useState(false);
   const [activeScreen, setActiveScreen] = useState<
     | "menu"
@@ -944,6 +951,7 @@ export function HomeScreen() {
         dailyLoginBonusAwarded?: boolean;
         dailyLoginBonusPoints?: unknown;
         gachaPoints?: unknown;
+        menuOrder?: unknown;
         name?: string | null;
         needsProfileSetup?: boolean;
         nickname?: string | null;
@@ -962,6 +970,7 @@ export function HomeScreen() {
     setStudyTypeId(parseStudyTypeId(result?.student?.studyTypeId));
     setPendingStudyTypeId(parseStudyTypeId(result?.student?.studyTypeId));
     setAppFeatures(parseClassAppFeatures(result?.student?.appFeatures));
+    setMenuOrder(parseMenuOrder(result?.student?.menuOrder));
     const gachaPoints = normalizeGachaPoints(result?.student?.gachaPoints);
     const dailyLoginBonusAwarded = Boolean(result?.student?.dailyLoginBonusAwarded);
 
@@ -1115,6 +1124,7 @@ export function HomeScreen() {
     setIsLoggedInPreview(false);
     setActiveScreen("menu");
     setAppFeatures(DEFAULT_CLASS_APP_FEATURES);
+    setMenuOrder(DEFAULT_MENU_ORDER);
     setSelectedSubject(null);
     setSelectedCollectionCard(null);
     setGachaResultCard(null);
@@ -4028,12 +4038,13 @@ export function HomeScreen() {
           </section>
 
           <nav className="menuList" aria-label="学習管理メニュー">
-            {menuItems
-              .filter((item) => {
+            {sortMenuItemsByOrder(
+              menuItems.filter((item) => {
                 const featureKey = MENU_FEATURE_BY_TITLE[item.title];
                 return !featureKey || appFeatures[featureKey] !== false;
-              })
-              .map((item) => (
+              }),
+              menuOrder,
+            ).map((item) => (
               <button
                 className="menuItem"
                 key={item.title}
