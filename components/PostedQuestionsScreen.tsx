@@ -1,10 +1,12 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useState } from "react";
-import type {
-  PostedQuestionChallenge,
-  PostedQuestionListItem,
-  PostedQuestionSort,
+import {
+  POSTED_QUESTION_SUBJECTS,
+  type PostedQuestionChallenge,
+  type PostedQuestionListItem,
+  type PostedQuestionSort,
+  type PostedQuestionSubjectId,
 } from "@/lib/postedQuestions";
 
 type PostedQuestionsScreenProps = {
@@ -24,11 +26,17 @@ export function PostedQuestionsScreen({
   const [view, setView] = useState<ScreenView>("list");
   const [listTab, setListTab] = useState<ListTab>("all");
   const [sort, setSort] = useState<PostedQuestionSort>("recent");
+  const [filterSubjectId, setFilterSubjectId] = useState<
+    PostedQuestionSubjectId | ""
+  >("");
   const [questions, setQuestions] = useState<PostedQuestionListItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [message, setMessage] = useState("");
   const [likeBusyId, setLikeBusyId] = useState<string | null>(null);
 
+  const [createSubjectId, setCreateSubjectId] = useState<
+    PostedQuestionSubjectId | ""
+  >("");
   const [createBody, setCreateBody] = useState("");
   const [createChoices, setCreateChoices] = useState(["", "", "", ""]);
   const [createCorrectIndex, setCreateCorrectIndex] = useState(0);
@@ -53,6 +61,9 @@ export function PostedQuestionsScreen({
     if (listTab === "mine") {
       params.set("mine", "1");
     }
+    if (filterSubjectId) {
+      params.set("subject", filterSubjectId);
+    }
 
     const response = await fetch(`/api/posted-questions?${params}`).catch(
       () => null,
@@ -73,7 +84,7 @@ export function PostedQuestionsScreen({
     } | null;
 
     setQuestions(result?.questions ?? []);
-  }, [listTab, sort]);
+  }, [filterSubjectId, listTab, sort]);
 
   useEffect(() => {
     if (view !== "list") {
@@ -205,6 +216,11 @@ export function PostedQuestionsScreen({
       return;
     }
 
+    if (!createSubjectId) {
+      setCreateMessage("科目を選択してください。");
+      return;
+    }
+
     setIsSubmitting(true);
     setCreateMessage("");
 
@@ -212,6 +228,7 @@ export function PostedQuestionsScreen({
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
+        subjectId: createSubjectId,
         body: createBody,
         choice1: createChoices[0],
         choice2: createChoices[1],
@@ -232,6 +249,7 @@ export function PostedQuestionsScreen({
       return;
     }
 
+    setCreateSubjectId("");
     setCreateBody("");
     setCreateChoices(["", "", "", ""]);
     setCreateCorrectIndex(0);
@@ -303,6 +321,27 @@ export function PostedQuestionsScreen({
           </header>
 
           <form className="timerContent postedCreateForm" onSubmit={handleCreate}>
+            <label className="profileField">
+              科目
+              <select
+                className="postedSelect"
+                value={createSubjectId}
+                required
+                onChange={(event) =>
+                  setCreateSubjectId(
+                    event.target.value as PostedQuestionSubjectId | "",
+                  )
+                }
+              >
+                <option value="">科目を選択</option>
+                {POSTED_QUESTION_SUBJECTS.map((subject) => (
+                  <option key={subject.id} value={subject.id}>
+                    {subject.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+
             <label className="profileField">
               問題文
               <textarea
@@ -407,7 +446,7 @@ export function PostedQuestionsScreen({
               <>
                 <div className="postedChallengeMeta">
                   <p>
-                    投稿: {challenge.authorDisplayName}
+                    {challenge.subjectLabel}・投稿: {challenge.authorDisplayName}
                     {challenge.isMine ? "（自分）" : ""}
                   </p>
                   {challenge.isMine ? (
@@ -575,6 +614,27 @@ export function PostedQuestionsScreen({
                   人気
                 </button>
               </div>
+
+              <label className="postedFilterField">
+                <span className="postedFilterLabel">科目</span>
+                <select
+                  className="postedSelect"
+                  value={filterSubjectId}
+                  aria-label="科目で絞り込み"
+                  onChange={(event) =>
+                    setFilterSubjectId(
+                      event.target.value as PostedQuestionSubjectId | "",
+                    )
+                  }
+                >
+                  <option value="">すべて</option>
+                  {POSTED_QUESTION_SUBJECTS.map((subject) => (
+                    <option key={subject.id} value={subject.id}>
+                      {subject.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
             </div>
 
             {message ? (
@@ -603,6 +663,7 @@ export function PostedQuestionsScreen({
                     type="button"
                     onClick={() => void openChallenge(item.id)}
                   >
+                    <p className="postedQuestionSubject">{item.subjectLabel}</p>
                     <p className="postedQuestionBody">{item.body}</p>
                     <p className="postedQuestionAuthor">
                       {item.authorDisplayName}

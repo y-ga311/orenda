@@ -4120,7 +4120,8 @@ a.resourceLinkItem:focus-visible {
   padding-bottom: 24px;
 }
 
-.postedTextarea {
+.postedTextarea,
+.postedSelect {
   width: 100%;
   border: 1px solid #d1d1d6;
   border-radius: 12px;
@@ -4128,7 +4129,32 @@ a.resourceLinkItem:focus-visible {
   background: #f9f9fb;
   color: #1d1d1f;
   font: inherit;
+}
+
+.postedTextarea {
   resize: vertical;
+}
+
+.postedSelect {
+  min-height: 42px;
+}
+
+.postedFilterField {
+  display: grid;
+  gap: 6px;
+}
+
+.postedFilterLabel {
+  color: #6e6e73;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.postedQuestionSubject {
+  margin: 0;
+  color: #ff9500;
+  font-size: 11px;
+  font-weight: 800;
 }
 
 .postedChoiceRow {

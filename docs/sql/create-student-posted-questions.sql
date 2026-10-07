@@ -4,6 +4,7 @@
 CREATE TABLE IF NOT EXISTS public.student_posted_questions (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   author_gakusei_id text NOT NULL,
+  subject_id text NOT NULL,
   body text NOT NULL,
   choice_1 text NOT NULL,
   choice_2 text NOT NULL,
@@ -19,6 +20,8 @@ CREATE TABLE IF NOT EXISTS public.student_posted_questions (
     CHECK (correct_index >= 0 AND correct_index <= 3),
   CONSTRAINT student_posted_questions_like_count_check
     CHECK (like_count >= 0),
+  CONSTRAINT student_posted_questions_subject_id_check
+    CHECK (char_length(btrim(subject_id)) >= 1 AND char_length(subject_id) <= 40),
   CONSTRAINT student_posted_questions_body_check
     CHECK (char_length(btrim(body)) >= 1 AND char_length(body) <= 800),
   CONSTRAINT student_posted_questions_choice_1_check
@@ -39,6 +42,9 @@ CREATE INDEX IF NOT EXISTS student_posted_questions_active_likes_idx
 
 CREATE INDEX IF NOT EXISTS student_posted_questions_author_idx
   ON public.student_posted_questions (author_gakusei_id, created_at DESC);
+
+CREATE INDEX IF NOT EXISTS student_posted_questions_active_subject_idx
+  ON public.student_posted_questions (is_active, subject_id, created_at DESC);
 
 CREATE TABLE IF NOT EXISTS public.student_posted_question_likes (
   question_id uuid NOT NULL
@@ -81,3 +87,6 @@ COMMENT ON COLUMN public.student_posted_questions.like_count IS
 
 COMMENT ON COLUMN public.student_posted_questions.correct_index IS
   '正解の選択肢 index（0〜3 = 選択肢1〜4）。';
+
+COMMENT ON COLUMN public.student_posted_questions.subject_id IS
+  '科目ID（kaibou / seiri 等。クエスト科目と同じキー）。';

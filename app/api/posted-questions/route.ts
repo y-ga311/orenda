@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import {
   createPostedQuestion,
+  isPostedQuestionSubjectId,
   listPostedQuestions,
   parsePostedQuestionInput,
   type PostedQuestionSort,
@@ -36,11 +37,16 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   const sort = parseSort(url.searchParams.get("sort"));
   const mineOnly = url.searchParams.get("mine") === "1";
+  const subjectParam = url.searchParams.get("subject");
+  const subjectId = isPostedQuestionSubjectId(subjectParam)
+    ? subjectParam
+    : null;
 
   const { questions, error } = await listPostedQuestions(supabase, {
     currentStudentId: studentId,
     sort,
     mineOnly,
+    subjectId,
   });
 
   if (error) {
@@ -51,7 +57,7 @@ export async function GET(request: Request) {
     );
   }
 
-  return NextResponse.json({ questions, sort, mineOnly });
+  return NextResponse.json({ questions, sort, mineOnly, subjectId });
 }
 
 export async function POST(request: Request) {

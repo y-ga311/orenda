@@ -7,11 +7,56 @@ export const POSTED_QUESTION_CHOICE_MAX = 200;
 export const POSTED_QUESTION_EXPLANATION_MAX = 800;
 export const POSTED_QUESTION_LIST_LIMIT = 40;
 
+/** クエスト科目と同じ ID / 表示名 */
+export const POSTED_QUESTION_SUBJECTS = [
+  { id: "kaibou", label: "解剖学" },
+  { id: "seiri", label: "生理学" },
+  { id: "byouri", label: "病理学概論" },
+  { id: "souron", label: "臨床医学総論" },
+  { id: "kakuron", label: "臨床医学各論" },
+  { id: "reha", label: "リハビリテーション医学" },
+  { id: "tougai", label: "東洋医学概論" },
+  { id: "keiketu", label: "経絡経穴概論" },
+  { id: "tourin", label: "東洋医学臨床論" },
+  { id: "hari", label: "はり理論" },
+  { id: "kyu", label: "きゅう理論" },
+  { id: "iryogairon", label: "医療概論" },
+  { id: "eisei", label: "衛生学・公衆衛生学" },
+  { id: "kankeihouki", label: "関係法規" },
+] as const;
+
+export type PostedQuestionSubjectId =
+  (typeof POSTED_QUESTION_SUBJECTS)[number]["id"];
+
+const postedQuestionSubjectIdSet = new Set<string>(
+  POSTED_QUESTION_SUBJECTS.map((subject) => subject.id),
+);
+
+export function isPostedQuestionSubjectId(
+  value: unknown,
+): value is PostedQuestionSubjectId {
+  return typeof value === "string" && postedQuestionSubjectIdSet.has(value);
+}
+
+export function getPostedQuestionSubjectLabel(
+  subjectId: string | null | undefined,
+): string {
+  if (!subjectId) {
+    return "科目未設定";
+  }
+
+  const found = POSTED_QUESTION_SUBJECTS.find(
+    (subject) => subject.id === subjectId,
+  );
+  return found?.label ?? "科目未設定";
+}
+
 export type PostedQuestionSort = "recent" | "popular";
 
 export type PostedQuestionRow = {
   id: string;
   author_gakusei_id: string;
+  subject_id: string | null;
   body: string;
   choice_1: string;
   choice_2: string;
@@ -27,6 +72,8 @@ export type PostedQuestionRow = {
 export type PostedQuestionListItem = {
   id: string;
   body: string;
+  subjectId: string | null;
+  subjectLabel: string;
   authorGakuseiId: string;
   authorDisplayName: string;
   likeCount: number;
@@ -38,6 +85,8 @@ export type PostedQuestionListItem = {
 export type PostedQuestionChallenge = {
   id: string;
   body: string;
+  subjectId: string | null;
+  subjectLabel: string;
   choices: [string, string, string, string];
   authorGakuseiId: string;
   authorDisplayName: string;
@@ -61,6 +110,7 @@ function trimText(value: unknown, max: number): string | null {
 export function parsePostedQuestionInput(body: unknown): {
   error: string | null;
   value: {
+    subjectId: PostedQuestionSubjectId;
     body: string;
     choice1: string;
     choice2: string;
@@ -77,6 +127,11 @@ export function parsePostedQuestionInput(body: unknown): {
 
   if (!source) {
     return { error: "リクエストが不正です。", value: null };
+  }
+
+  const subjectRaw = source.subjectId ?? source.subject_id;
+  if (!isPostedQuestionSubjectId(subjectRaw)) {
+    return { error: "科目を選択してください。", value: null };
   }
 
   const questionBody = trimText(source.body, POSTED_QUESTION_BODY_MAX);
@@ -119,6 +174,7 @@ export function parsePostedQuestionInput(body: unknown): {
   return {
     error: null,
     value: {
+      subjectId: subjectRaw,
       body: questionBody,
       choice1,
       choice2,
@@ -139,6 +195,8 @@ export function mapPostedQuestionListItem(
   return {
     id: row.id,
     body: row.body,
+    subjectId: row.subject_id,
+    subjectLabel: getPostedQuestionSubjectLabel(row.subject_id),
     authorGakuseiId: row.author_gakusei_id,
     authorDisplayName,
     likeCount: row.like_count ?? 0,
@@ -157,6 +215,8 @@ export function mapPostedQuestionChallenge(
   return {
     id: row.id,
     body: row.body,
+    subjectId: row.subject_id,
+    subjectLabel: getPostedQuestionSubjectLabel(row.subject_id),
     choices: [row.choice_1, row.choice_2, row.choice_3, row.choice_4],
     authorGakuseiId: row.author_gakusei_id,
     authorDisplayName,
@@ -237,6 +297,7 @@ export async function listPostedQuestions(
     currentStudentId: string;
     sort: PostedQuestionSort;
     mineOnly?: boolean;
+    subjectId?: PostedQuestionSubjectId | null;
     limit?: number;
   },
 ): Promise<{ questions: PostedQuestionListItem[]; error: string | null }> {
@@ -248,12 +309,16 @@ export async function listPostedQuestions(
   let query = supabase
     .from("student_posted_questions")
     .select(
-      "id, author_gakusei_id, body, choice_1, choice_2, choice_3, choice_4, correct_index, explanation, like_count, is_active, created_at",
+      "id, author_gakusei_id, subject_id, body, choice_1, choice_2, choice_3, choice_4, correct_index, explanation, like_count, is_active, created_at",
     )
     .eq("is_active", true);
 
   if (options.mineOnly) {
     query = query.eq("author_gakusei_id", options.currentStudentId);
+  }
+
+  if (options.subjectId) {
+    query = query.eq("subject_id", options.subjectId);
   }
 
   if (options.sort === "popular") {
@@ -298,6 +363,7 @@ export async function createPostedQuestion(
   supabase: SupabaseClient,
   authorGakuseiId: string,
   input: {
+    subjectId: PostedQuestionSubjectId;
     body: string;
     choice1: string;
     choice2: string;
@@ -311,6 +377,7 @@ export async function createPostedQuestion(
     .from("student_posted_questions")
     .insert({
       author_gakusei_id: authorGakuseiId,
+      subject_id: input.subjectId,
       body: input.body,
       choice_1: input.choice1,
       choice_2: input.choice2,
@@ -341,7 +408,7 @@ export async function fetchPostedQuestionById(
   const { data, error } = await supabase
     .from("student_posted_questions")
     .select(
-      "id, author_gakusei_id, body, choice_1, choice_2, choice_3, choice_4, correct_index, explanation, like_count, is_active, created_at",
+      "id, author_gakusei_id, subject_id, body, choice_1, choice_2, choice_3, choice_4, correct_index, explanation, like_count, is_active, created_at",
     )
     .eq("id", questionId)
     .eq("is_active", true)
