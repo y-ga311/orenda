@@ -3920,14 +3920,21 @@ export function HomeScreen() {
                       <p className="rankingEmptyText">まだカードを持っていません。</p>
                     ) : (
                       <div className="friendCardGrid">
-                        {friendProfile.ownedCardNos.map((cardNo) => (
-                          <Image
-                            key={cardNo}
-                            src={getCardImage(cardNo)}
-                            alt={`カード ${cardNo}`}
-                            className="friendCardImage"
-                          />
-                        ))}
+                        {friendProfile.ownedCardNos.map((cardNo) => {
+                          const image = getCardImage(cardNo);
+                          if (!image) {
+                            return null;
+                          }
+
+                          return (
+                            <Image
+                              key={cardNo}
+                              src={image}
+                              alt={`カード ${cardNo}`}
+                              className="friendCardImage"
+                            />
+                          );
+                        })}
                       </div>
                     )}
                   </section>
