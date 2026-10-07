@@ -999,11 +999,11 @@ export function HomeScreen() {
       return;
     }
 
-    const friendId = selectedFriendId;
-    if (!friendId) {
+    if (!selectedFriendId) {
       return;
     }
 
+    const friendId: string = selectedFriendId;
     let isMounted = true;
 
     async function loadFriendProfile() {
