@@ -11,8 +11,8 @@ import {
   getPeriodRange,
   type RankingPeriod,
 } from "@/lib/studyRankingPeriod";
+import { fetchFollowRelations, type FollowRelation } from "@/lib/studentFollows";
 import { createServiceRoleSupabaseClient } from "@/lib/supabaseServiceRole";
-import { decryptStudentRows } from "@/lib/studentNameCrypto.server";
 
 export const runtime = "nodejs";
 
@@ -20,7 +20,6 @@ type Student = {
   avatar_icon_id: string | null;
   class: string | null;
   gakusei_id: string;
-  name: string | null;
   nickname: string | null;
 };
 
@@ -28,6 +27,7 @@ type RankingStudent = {
   avatarIconId: string;
   className: string | null;
   displayName: string;
+  followRelation: FollowRelation | null;
   gakuseiId: string;
   isCurrentUser: boolean;
   note: string;
@@ -47,12 +47,14 @@ function formatStudyDays(dateKeys: Set<string>) {
 
 function buildRankingStudent({
   currentStudentId,
+  followRelation,
   minutesByStudent,
   rank,
   student,
   studyDateKeysByStudent,
 }: {
   currentStudentId: string;
+  followRelation: FollowRelation | null;
   minutesByStudent: Map<string, number>;
   rank: number | null;
   student: Student;
@@ -63,12 +65,13 @@ function buildRankingStudent({
   return {
     rank,
     gakuseiId: student.gakusei_id,
-    displayName: student.nickname || student.name || "未設定",
+    displayName: student.nickname?.trim() || "ニックネーム未設定",
     avatarIconId: student.avatar_icon_id ?? "pixel01",
     className: student.class,
     totalMinutes: minutesByStudent.get(student.gakusei_id) ?? 0,
     note: formatStudyDays(studyDateKeys),
     isCurrentUser: student.gakusei_id === currentStudentId,
+    followRelation,
   };
 }
 
@@ -166,7 +169,7 @@ export async function GET(request: Request) {
 
   const { data: students, error: studentsError } = await supabase
     .from("students")
-    .select("gakusei_id, name, nickname, avatar_icon_id, class")
+    .select("gakusei_id, nickname, avatar_icon_id, class")
     .in("gakusei_id", studentIdsToFetch);
 
   if (studentsError) {
@@ -177,7 +180,7 @@ export async function GET(request: Request) {
   }
 
   const studentById = new Map(
-    (await decryptStudentRows((students ?? []) as Student[])).map((student) => [
+    ((students ?? []) as Student[]).map((student) => [
       student.gakusei_id,
       student,
     ]),
@@ -187,11 +190,17 @@ export async function GET(request: Request) {
   );
   const currentStudent = studentById.get(currentStudentId);
   const recentGrants = await listRecentRankingRewardGrants(supabase, currentStudentId, 3);
+  const { relations: followRelations } = await fetchFollowRelations(
+    supabase,
+    currentStudentId,
+    topStudentIds,
+  );
 
   return NextResponse.json({
     currentUser: currentStudent
       ? buildRankingStudent({
           currentStudentId,
+          followRelation: null,
           minutesByStudent,
           rank: rankByStudentId.get(currentStudentId) ?? null,
           student: currentStudent,
@@ -208,6 +217,10 @@ export async function GET(request: Request) {
       return [
         buildRankingStudent({
           currentStudentId,
+          followRelation:
+            studentId === currentStudentId
+              ? null
+              : (followRelations.get(studentId) ?? "none"),
           minutesByStudent,
           rank: rankByStudentId.get(studentId) ?? null,
           student,

@@ -906,12 +906,44 @@ button {
   -webkit-overflow-scrolling: touch;
 }
 
+.questQuestionMeta {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
 .questQuestionProgress {
   margin: 0;
   color: #6e6e73;
   font-size: 14px;
   font-weight: 600;
   text-align: center;
+}
+
+.questElapsedTime {
+  margin: 0;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.82);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  color: #1d1d1f;
+  font-variant-numeric: tabular-nums;
+}
+
+.questElapsedTimeLabel {
+  color: #6e6e73;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.questElapsedTimeValue {
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
 }
 
 .questSetupMain {
@@ -2011,6 +2043,75 @@ button {
   box-shadow: 0 2px 8px rgba(0, 122, 255, 0.22);
 }
 
+.studentSearchCard {
+  display: grid;
+  gap: 10px;
+  border: 1px solid #e5e5ea;
+  border-radius: 16px;
+  padding: 16px;
+  background: #fff;
+}
+
+.studentSearchCard > p {
+  margin: 0;
+  color: #6e6e73;
+  font-size: 13px;
+}
+
+.studentSearchForm {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+}
+
+.studentSearchInput {
+  min-height: 40px;
+  border: 1px solid #d1d1d6;
+  border-radius: 12px;
+  padding: 0 12px;
+  background: #f9f9fb;
+  color: #1d1d1f;
+  font-size: 14px;
+}
+
+.studentSearchInput:focus {
+  outline: 2px solid rgba(0, 122, 255, 0.35);
+  outline-offset: 1px;
+  border-color: #007aff;
+  background: #fff;
+}
+
+.studentSearchButton {
+  min-height: 40px;
+  border: 0;
+  border-radius: 12px;
+  padding: 0 16px;
+  background: #007aff;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.studentSearchButton:disabled {
+  opacity: 0.6;
+}
+
+.studentSearchItem {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  min-height: 64px;
+  border: 1px solid #e5e5ea;
+  border-radius: 14px;
+  padding: 10px 12px;
+  background: #f9f9fb;
+}
+
+.studentSearchItem .rankingFollowButton {
+  justify-self: end;
+}
+
 .rankingCurrentCard {
   display: grid;
   gap: 10px;
@@ -2021,7 +2122,8 @@ button {
 }
 
 .rankingCurrentCard h2,
-.rankingList h2 {
+.rankingList h2,
+.studentSearchCard h2 {
   margin: 0;
   color: #1d1d1f;
   font-size: 15px;
@@ -2043,6 +2145,200 @@ button {
   border-radius: 14px;
   padding: 0 14px;
   background: #fff;
+}
+
+.rankingItemWithFollow {
+  grid-template-columns: 24px 48px minmax(0, 1fr) auto;
+  grid-template-areas:
+    "rank avatar meta time"
+    "rank avatar action action";
+  row-gap: 8px;
+  padding: 12px 14px;
+}
+
+.rankingItemWithFollow .rankingRank {
+  grid-area: rank;
+}
+
+.rankingItemWithFollow .rankingAvatar {
+  grid-area: avatar;
+}
+
+.rankingItemWithFollow .rankingMeta {
+  grid-area: meta;
+}
+
+.rankingItemWithFollow strong {
+  grid-area: time;
+}
+
+.rankingFollowButton {
+  grid-area: action;
+  justify-self: start;
+  min-height: 32px;
+  border: 1px solid #007aff;
+  border-radius: 999px;
+  padding: 0 14px;
+  background: #007aff;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.rankingFollowButton:disabled {
+  opacity: 0.6;
+}
+
+.rankingFollowButtonFollowing {
+  border-color: #c7c7cc;
+  background: #f2f2f7;
+  color: #3a3a3c;
+}
+
+.rankingFollowButtonMutual {
+  border-color: #34c759;
+  background: #e8f8ed;
+  color: #1b7f3a;
+}
+
+.friendProfileContent {
+  gap: 16px;
+}
+
+.friendProfileHeader {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  border: 1px solid #e5e5ea;
+  border-radius: 16px;
+  padding: 20px 16px;
+  background: #fff;
+  text-align: center;
+}
+
+.friendProfileAvatar {
+  width: 72px;
+  height: 72px;
+  border-radius: 999px;
+  object-fit: cover;
+}
+
+.friendProfileHeader h2 {
+  margin: 0;
+  color: #1d1d1f;
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.friendProfileHeader p {
+  margin: 0;
+  color: #8e8e93;
+  font-size: 13px;
+}
+
+.friendProfileMutualBadge {
+  display: inline-flex;
+  margin-top: 4px !important;
+  border-radius: 999px;
+  padding: 4px 10px;
+  background: #e8f8ed;
+  color: #1b7f3a !important;
+  font-size: 12px !important;
+  font-weight: 700;
+}
+
+.friendProfileSection {
+  display: grid;
+  gap: 10px;
+  border: 1px solid #e5e5ea;
+  border-radius: 16px;
+  padding: 16px;
+  background: #fff;
+}
+
+.friendProfileSection h3 {
+  margin: 0;
+  color: #1d1d1f;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.friendProfileTotal {
+  margin: 0;
+  color: #6e6e73;
+  font-size: 13px;
+}
+
+.friendSubjectList {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.friendSubjectList li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 10px;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid #f2f2f7;
+  color: #1d1d1f;
+  font-size: 14px;
+}
+
+.friendSubjectList li:last-child {
+  border-bottom: 0;
+}
+
+.friendSubjectList strong {
+  font-weight: 700;
+}
+
+.friendSubjectList em {
+  color: #8e8e93;
+  font-style: normal;
+  font-size: 12px;
+}
+
+.friendMedalGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.friendMedalItem {
+  display: grid;
+  gap: 6px;
+  justify-items: center;
+  text-align: center;
+}
+
+.friendMedalImage {
+  width: 64px;
+  height: 64px;
+  object-fit: contain;
+}
+
+.friendMedalItem p {
+  margin: 0;
+  color: #3a3a3c;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.friendCardGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.friendCardImage {
+  width: 100%;
+  height: auto;
+  border-radius: 8px;
 }
 
 .rankingItemCurrent {
@@ -2423,16 +2719,41 @@ button {
   min-width: 0;
 }
 
+.medalRingStage {
+  position: relative;
+  width: 100%;
+  max-width: min(116px, 31vw);
+}
+
 .medalRingWrap {
   box-sizing: border-box;
   width: 100%;
-  max-width: min(116px, 31vw);
   aspect-ratio: 1;
   height: auto;
   flex-shrink: 1;
   border-radius: 999px;
   padding: 1px;
   background: linear-gradient(145deg, #fff6cf 0%, #d9b455 42%, #f6da8a 100%);
+}
+
+.medalClassRate {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  z-index: 2;
+  min-width: 2.4em;
+  padding: 2px 5px;
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  border-radius: 999px;
+  background: #ff9500;
+  color: #fff;
+  font-size: clamp(9px, 2.5vw, 11px);
+  font-weight: 800;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+  text-align: center;
+  pointer-events: none;
+  box-shadow: 0 1px 3px rgba(255, 149, 0, 0.35);
 }
 
 .medalRingInner {
@@ -2834,6 +3155,73 @@ button {
 .menuIcon-pink {
   background: #fff0f5;
   color: #ff2d55;
+}
+
+.menuIcon-teal {
+  background: #e6faf5;
+  color: #0d9488;
+}
+
+.menuIcon-orange {
+  background: #fff4e8;
+  color: #ff9500;
+}
+
+.menuIcon-purple {
+  background: #f3eefc;
+  color: #7c3aed;
+}
+
+.menuIcon-slate {
+  background: #eef2f6;
+  color: #475569;
+}
+
+.menuIcon-cyan {
+  background: #e8f8fc;
+  color: #0891b2;
+}
+
+.resourceLinksContent {
+  display: grid;
+  align-content: start;
+  gap: 14px;
+}
+
+.resourceLinksLead {
+  margin: 0;
+  padding: 0 6px;
+  color: #6e6e73;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.resourceLinksList {
+  padding-bottom: 12px;
+}
+
+a.resourceLinkItem {
+  text-decoration: none;
+  color: inherit;
+}
+
+a.resourceLinkItem:focus-visible {
+  outline: 2px solid rgba(0, 122, 255, 0.45);
+  outline-offset: 2px;
+}
+
+.resourceLinkIcon {
+  overflow: hidden;
+  padding: 0;
+  background: transparent;
+  border-radius: 12px;
+}
+
+.resourceLinkIconImage {
+  width: 44px;
+  height: 44px;
+  object-fit: cover;
+  display: block;
 }
 
 .menuText {
@@ -3564,5 +3952,220 @@ button {
   .phoneFrame {
     min-height: min(100svh - 24px, 760px);
   }
+}
+
+.timerContent.postedListContent {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  gap: 0;
+  min-height: 0;
+  overflow: hidden;
+  padding-bottom: 0;
+}
+
+.postedListScroll {
+  display: grid;
+  align-content: start;
+  gap: 12px;
+  min-height: 0;
+  overflow-y: auto;
+  padding-bottom: 12px;
+  -webkit-overflow-scrolling: touch;
+}
+
+.postedToolbar {
+  display: grid;
+  gap: 10px;
+}
+
+.postedSortTabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  border-radius: 12px;
+  padding: 4px;
+  background: #f2f2f7;
+}
+
+.postedCreateBar {
+  z-index: 5;
+  padding: 8px 0 calc(8px + env(safe-area-inset-bottom, 0px));
+  background: transparent;
+}
+
+.postedCreateEntryButton {
+  width: 100%;
+  min-height: 48px;
+  border: 0;
+  border-radius: 14px;
+  background: #ff9500;
+  color: #fff;
+  font-size: 15px;
+  font-weight: 800;
+  box-shadow: 0 6px 16px rgba(255, 149, 0, 0.35);
+}
+
+.postedCreateEntryButton:active {
+  transform: translateY(1px);
+}
+
+.profileSubmitButton.postedSubmitButton {
+  width: 100%;
+  background: #ff9500;
+  box-shadow: 0 6px 16px rgba(255, 149, 0, 0.28);
+}
+
+.postedQuestionList {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0 0 8px;
+  list-style: none;
+}
+
+.postedQuestionCard {
+  display: grid;
+  gap: 10px;
+  border: 1px solid #e5e5ea;
+  border-radius: 16px;
+  padding: 14px;
+  background: #fff;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.06);
+}
+
+.postedQuestionMain {
+  display: grid;
+  gap: 6px;
+  width: 100%;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  text-align: left;
+  color: inherit;
+}
+
+.postedQuestionBody {
+  margin: 0;
+  color: #1d1d1f;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.5;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.postedQuestionAuthor {
+  margin: 0;
+  color: #8e8e93;
+  font-size: 12px;
+}
+
+.postedQuestionActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.postedLikeButton,
+.postedLikeCount,
+.postedDeleteButton,
+.postedChallengeButton {
+  min-height: 34px;
+  border-radius: 999px;
+  padding: 0 12px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.postedLikeButton {
+  border: 1px solid #ffd0dc;
+  background: #fff5f8;
+  color: #ff2d55;
+}
+
+.postedLikeButtonActive {
+  border-color: #ff2d55;
+  background: #ff2d55;
+  color: #fff;
+}
+
+.postedLikeCount {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid #e5e5ea;
+  background: #f2f2f7;
+  color: #8e8e93;
+}
+
+.postedDeleteButton {
+  border: 1px solid #d1d1d6;
+  background: #f2f2f7;
+  color: #3a3a3c;
+}
+
+.postedChallengeButton {
+  margin-left: auto;
+  border: 0;
+  background: #007aff;
+  color: #fff;
+}
+
+.postedCreateForm {
+  display: grid;
+  align-content: start;
+  gap: 12px;
+  padding-bottom: 24px;
+}
+
+.postedTextarea {
+  width: 100%;
+  border: 1px solid #d1d1d6;
+  border-radius: 12px;
+  padding: 10px 12px;
+  background: #f9f9fb;
+  color: #1d1d1f;
+  font: inherit;
+  resize: vertical;
+}
+
+.postedChoiceRow {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+}
+
+.postedChoiceRow input[type="text"],
+.postedChoiceRow input:not([type="radio"]) {
+  width: 100%;
+  min-height: 40px;
+  border: 1px solid #d1d1d6;
+  border-radius: 12px;
+  padding: 0 12px;
+  background: #f9f9fb;
+  color: #1d1d1f;
+  font: inherit;
+}
+
+.postedCreateHint {
+  margin: 0;
+  color: #6e6e73;
+  font-size: 12px;
+}
+
+.postedChallengeMeta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.postedChallengeMeta p {
+  margin: 0;
+  color: #6e6e73;
+  font-size: 13px;
 }
 

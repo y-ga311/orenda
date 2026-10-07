@@ -13,6 +13,9 @@ export const GACHA_POINTS_PER_QUEST_CORRECT = 1;
 /** 教員クエスト正解1問あたりに students.gacha_points へ加算する pt */
 export const GACHA_POINTS_PER_TEACHER_QUEST_CORRECT = 100;
 
+/** 投稿問題に他学生から初めていいねが付いたとき、投稿者へ加算する pt */
+export const GACHA_POINTS_PER_POSTED_QUESTION_LIKE = 10;
+
 /** 週間ランキング1位（先週・月曜起算）への報酬 pt */
 export const RANKING_WEEKLY_FIRST_PLACE_PT = 500;
 

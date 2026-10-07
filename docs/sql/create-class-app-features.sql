@@ -7,6 +7,11 @@ CREATE TABLE IF NOT EXISTS public.class_app_features (
   features jsonb NOT NULL DEFAULT '{
     "timer": true,
     "quest": true,
+    "student_quest": true,
+    "tsubotomy": true,
+    "grades": true,
+    "portfolio": true,
+    "links": true,
     "record": true,
     "collection": true,
     "ranking": true,
@@ -15,6 +20,11 @@ CREATE TABLE IF NOT EXISTS public.class_app_features (
   menu_order jsonb NOT NULL DEFAULT '[
     "timer",
     "quest",
+    "student_quest",
+    "tsubotomy",
+    "grades",
+    "portfolio",
+    "links",
     "record",
     "collection",
     "ranking",
@@ -32,6 +42,11 @@ UPDATE public.class_app_features
 SET menu_order = '[
   "timer",
   "quest",
+  "student_quest",
+  "tsubotomy",
+  "grades",
+  "portfolio",
+  "links",
   "record",
   "collection",
   "ranking",
@@ -43,6 +58,11 @@ ALTER TABLE public.class_app_features
   ALTER COLUMN menu_order SET DEFAULT '[
     "timer",
     "quest",
+    "student_quest",
+    "tsubotomy",
+    "grades",
+    "portfolio",
+    "links",
     "record",
     "collection",
     "ranking",
@@ -59,7 +79,7 @@ COMMENT ON COLUMN public.class_app_features.class_name IS
   'students.class と同じクラス名文字列';
 
 COMMENT ON COLUMN public.class_app_features.features IS
-  '機能フラグ JSON。キー: timer / quest / record / collection / ranking / mypage';
+  '機能フラグ JSON。キー: timer / quest / student_quest / tsubotomy / grades / portfolio / links / record / collection / ranking / mypage';
 
 COMMENT ON COLUMN public.class_app_features.menu_order IS
   'ホームメニューの上からの表示順（feature key の JSON 配列）。欠落キーはアプリ側で末尾に補完。';
@@ -68,8 +88,8 @@ COMMENT ON COLUMN public.class_app_features.menu_order IS
 -- INSERT INTO public.class_app_features (class_name, features, menu_order, updated_by)
 -- VALUES (
 --   '1年A',
---   '{"timer":true,"quest":true,"record":true,"collection":false,"ranking":false,"mypage":true}'::jsonb,
---   '["quest","timer","record","mypage","collection","ranking"]'::jsonb,
+--   '{"timer":true,"quest":true,"student_quest":true,"tsubotomy":true,"grades":true,"portfolio":true,"links":true,"record":true,"collection":false,"ranking":false,"mypage":true}'::jsonb,
+--   '["quest","timer","student_quest","tsubotomy","grades","portfolio","links","record","mypage","collection","ranking"]'::jsonb,
 --   'teacher@example.com'
 -- )
 -- ON CONFLICT (class_name) DO UPDATE

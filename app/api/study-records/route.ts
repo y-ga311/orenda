@@ -1,11 +1,17 @@
 import { createClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
+import {
+  getStudySessionDurationSeconds,
+  secondsToMinutes,
+  sumStudySessionDurationSeconds,
+} from "@/lib/studySessionDuration";
 
 export const runtime = "nodejs";
 
 type StudySession = {
   duration_minutes: number | null;
+  duration_seconds: number | null;
   studied_at: string | null;
   subject_name: string | null;
 };
@@ -52,12 +58,8 @@ function addDaysToJapanDate(year: number, month: number, day: number, offset: nu
   };
 }
 
-function sumDurationMinutes(sessions: { duration_minutes: number | null }[] | null) {
-  return (
-    sessions?.reduce((total, session) => {
-      return total + (session.duration_minutes ?? 0);
-    }, 0) ?? 0
-  );
+function sumDurationMinutes(sessions: StudySession[] | null) {
+  return secondsToMinutes(sumStudySessionDurationSeconds(sessions));
 }
 
 function buildSubjectBreakdown(sessions: StudySession[]) {
@@ -65,7 +67,7 @@ function buildSubjectBreakdown(sessions: StudySession[]) {
   let totalMinutes = 0;
 
   sessions.forEach((session) => {
-    const minutes = session.duration_minutes ?? 0;
+    const minutes = secondsToMinutes(getStudySessionDurationSeconds(session));
     const subjectName = session.subject_name ?? "未分類";
 
     totalMinutes += minutes;
@@ -87,7 +89,7 @@ function countStudiedDays(sessions: StudySession[]) {
   const studiedDateKeys = new Set<string>();
 
   sessions.forEach((session) => {
-    if (!session.studied_at || !session.duration_minutes) {
+    if (!session.studied_at || getStudySessionDurationSeconds(session) <= 0) {
       return;
     }
 
@@ -104,7 +106,7 @@ function buildPeriodSummary(sessions: StudySession[]) {
   return {
     totalMinutes,
     studiedDays,
-    averageMinutes: studiedDays > 0 ? Math.round(totalMinutes / studiedDays) : 0,
+    averageMinutes: studiedDays > 0 ? totalMinutes / studiedDays : 0,
   };
 }
 
@@ -124,7 +126,11 @@ function buildCalendarDays(
     }
 
     const key = getJapanDateKey(session.studied_at);
-    minutesByDate.set(key, (minutesByDate.get(key) ?? 0) + (session.duration_minutes ?? 0));
+    minutesByDate.set(
+      key,
+      (minutesByDate.get(key) ?? 0) +
+        secondsToMinutes(getStudySessionDurationSeconds(session)),
+    );
   });
 
   return Array.from({ length: 42 }, (_, index) => {
@@ -221,9 +227,12 @@ export async function GET(request: Request) {
     total: { startIso: null, endIso: null },
   }[period];
 
+  const sessionColumns =
+    "duration_minutes, duration_seconds, studied_at, subject_name";
+
   let periodQuery = supabase
     .from("study_sessions")
-    .select("duration_minutes, studied_at, subject_name")
+    .select(sessionColumns)
     .eq("gakusei_id", studentId);
 
   if (periodRange.startIso && periodRange.endIso) {
@@ -235,19 +244,19 @@ export async function GET(request: Request) {
   const [todayResult, monthResult, totalResult, periodResult] = await Promise.all([
     supabase
       .from("study_sessions")
-      .select("duration_minutes")
+      .select(sessionColumns)
       .eq("gakusei_id", studentId)
       .gte("studied_at", todayStartIso)
       .lt("studied_at", tomorrowStartIso),
     supabase
       .from("study_sessions")
-      .select("duration_minutes, studied_at, subject_name")
+      .select(sessionColumns)
       .eq("gakusei_id", studentId)
       .gte("studied_at", monthStartIso)
       .lt("studied_at", nextMonthStartIso),
     supabase
       .from("study_sessions")
-      .select("duration_minutes")
+      .select(sessionColumns)
       .eq("gakusei_id", studentId),
     periodQuery,
   ]);

@@ -1,6 +1,11 @@
 export const classAppFeatureKeys = [
   "timer",
   "quest",
+  "student_quest",
+  "tsubotomy",
+  "grades",
+  "portfolio",
+  "links",
   "record",
   "collection",
   "ranking",
@@ -15,6 +20,11 @@ export type ClassAppFeatures = Record<ClassAppFeatureKey, boolean>;
 export const DEFAULT_MENU_ORDER: ClassAppFeatureKey[] = [
   "timer",
   "quest",
+  "student_quest",
+  "tsubotomy",
+  "grades",
+  "portfolio",
+  "links",
   "record",
   "collection",
   "ranking",
@@ -24,6 +34,11 @@ export const DEFAULT_MENU_ORDER: ClassAppFeatureKey[] = [
 export const DEFAULT_CLASS_APP_FEATURES: ClassAppFeatures = {
   timer: true,
   quest: true,
+  student_quest: true,
+  tsubotomy: true,
+  grades: true,
+  portfolio: true,
+  links: true,
   record: true,
   collection: true,
   ranking: true,
@@ -33,7 +48,12 @@ export const DEFAULT_CLASS_APP_FEATURES: ClassAppFeatures = {
 /** メニュー・画面と feature key の対応 */
 export const MENU_FEATURE_BY_TITLE: Record<string, ClassAppFeatureKey> = {
   学習タイマー: "timer",
-  クエスト: "quest",
+  "４択クエスト": "quest",
+  投稿問題: "student_quest",
+  ツボトミー: "tsubotomy",
+  成績: "grades",
+  ポートフォリオ: "portfolio",
+  各種リンク: "links",
   勉強時間: "record",
   コレクション: "collection",
   交流: "ranking",
@@ -50,7 +70,9 @@ export type AppScreenForFeature =
   | "medal"
   | "gacha"
   | "mypage"
-  | "quest";
+  | "quest"
+  | "links"
+  | "student_quest";
 
 function isClassAppFeatureKey(value: unknown): value is ClassAppFeatureKey {
   return (
@@ -68,6 +90,8 @@ export function featureKeyForScreen(
       return "timer";
     case "quest":
       return "quest";
+    case "student_quest":
+      return "student_quest";
     case "record":
       return "record";
     case "collection":
@@ -78,6 +102,8 @@ export function featureKeyForScreen(
       return "ranking";
     case "mypage":
       return "mypage";
+    case "links":
+      return "links";
     case "menu":
     default:
       return null;

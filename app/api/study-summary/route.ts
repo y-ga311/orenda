@@ -1,6 +1,10 @@
 import { createClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
+import {
+  secondsToMinutes,
+  sumStudySessionDurationSeconds,
+} from "@/lib/studySessionDuration";
 
 export const runtime = "nodejs";
 
@@ -28,16 +32,6 @@ function getJapanTodayStartIso() {
 function getJapanMonthStartIso() {
   const { year, month } = getJapanDateParts();
   return getJapanBoundaryIso(year, month, 1);
-}
-
-function sumDurationMinutes(
-  sessions: { duration_minutes: number | null }[] | null,
-) {
-  return (
-    sessions?.reduce((total, session) => {
-      return total + (session.duration_minutes ?? 0);
-    }, 0) ?? 0
-  );
 }
 
 export async function GET() {
@@ -70,21 +64,22 @@ export async function GET() {
 
   const todayStartIso = getJapanTodayStartIso();
   const monthStartIso = getJapanMonthStartIso();
+  const sessionColumns = "duration_minutes, duration_seconds";
 
   const [todayResult, monthResult, totalResult] = await Promise.all([
     supabase
       .from("study_sessions")
-      .select("duration_minutes")
+      .select(sessionColumns)
       .eq("gakusei_id", studentId)
       .gte("studied_at", todayStartIso),
     supabase
       .from("study_sessions")
-      .select("duration_minutes")
+      .select(sessionColumns)
       .eq("gakusei_id", studentId)
       .gte("studied_at", monthStartIso),
     supabase
       .from("study_sessions")
-      .select("duration_minutes")
+      .select(sessionColumns)
       .eq("gakusei_id", studentId),
   ]);
 
@@ -98,8 +93,8 @@ export async function GET() {
   }
 
   return NextResponse.json({
-    todayMinutes: sumDurationMinutes(todayResult.data),
-    monthMinutes: sumDurationMinutes(monthResult.data),
-    totalMinutes: sumDurationMinutes(totalResult.data),
+    todayMinutes: secondsToMinutes(sumStudySessionDurationSeconds(todayResult.data)),
+    monthMinutes: secondsToMinutes(sumStudySessionDurationSeconds(monthResult.data)),
+    totalMinutes: secondsToMinutes(sumStudySessionDurationSeconds(totalResult.data)),
   });
 }

@@ -1,4 +1,4 @@
-# OrendaSchool 実装プロンプト：クラス別・学生アプリメニューON/OFF＋表示順
+# OrendaSchool 実装プロンプト：学生アプリメニュー設定の更新（11項目）
 
 以下をそのまま OrendaSchool リポジトリの Cursor / Chat に貼り付けて実装してください。
 
@@ -6,9 +6,47 @@
 
 ## 依頼内容
 
-共有 Supabase 上の `class_app_features` を、教員向け管理画面からクラス単位で編集できるようにしてください。  
-学生アプリ（Orenda）はログイン時にこの設定を読み、**メニューの表示/非表示**と**ホームメニュー上からの表示順**を制御します。  
-**OrendaSchool 側は「一覧・編集・保存」のみ**で十分です（学生アプリ側の表示ロジックは実装済み）。
+学生アプリ（Orenda）のホームメニューが **6項目 → 11項目** に増えたため、教員向けの「学生アプリメニュー設定」（`class_app_features` の ON/OFF＋表示順）を追従させてください。
+
+既存のメニュー設定画面がある場合は **それを修正**。無い場合は新規実装。
+
+OrendaSchool 側は「一覧・編集・保存」のみで十分です（学生アプリ側の表示ロジックは実装済み）。
+
+## 変更点（必読）
+
+### 追加された feature key（5つ）
+
+| key | 学生アプリのメニュー名 | 備考 |
+|---|---|---|
+| `student_quest` | 投稿問題 | 学生投稿の４択・挑戦・いいね（Orenda実装済み） |
+| `tsubotomy` | ツボトミー | 画面未実装・メニュー表示のみ |
+| `grades` | 成績 | 画面未実装・メニュー表示のみ |
+| `portfolio` | ポートフォリオ | 画面未実装・メニュー表示のみ |
+| `links` | 各種リンク | 学生ポータル等の外部リンク一覧（Orenda実装済み） |
+
+### ラベル変更（key は据え置き）
+
+| key | 旧ラベル | 新ラベル |
+|---|---|---|
+| `quest` | クエスト | **４択クエスト** |
+| `student_quest` | 学生作成問題（仮） | **投稿問題** |
+| `grades` | 成績確認（仮） | **成績** |
+
+※ DB の key は変更しない。UI の日本語ラベルだけ合わせる。
+
+### 全11キー（この並びが既定の表示順）
+
+1. `timer` … 学習タイマー  
+2. `quest` … ４択クエスト  
+3. `student_quest` … 投稿問題  
+4. `tsubotomy` … ツボトミー  
+5. `grades` … 成績  
+6. `portfolio` … ポートフォリオ  
+7. `links` … 各種リンク  
+8. `record` … 勉強時間  
+9. `collection` … コレクション  
+10. `ranking` … 交流  
+11. `mypage` … マイページ  
 
 ## 前提
 
@@ -21,6 +59,9 @@
   - 新規: Orenda の `docs/sql/create-class-app-features.sql`
   - 既存テーブルに並び順だけ追加: Orenda の `docs/sql/add-class-app-features-menu-order.sql`
   - 未実行なら先に Supabase で実行する
+- **既存 DB の `features` / `menu_order` に新キーが無くても可**  
+  Orenda 側は欠落キーを `true`・既定順末尾に補完する。  
+  ただし OrendaSchool の保存時は **11キーすべてを明示して書き込む**こと。
 
 ## テーブル仕様
 
@@ -30,6 +71,11 @@ CREATE TABLE IF NOT EXISTS public.class_app_features (
   features jsonb NOT NULL DEFAULT '{
     "timer": true,
     "quest": true,
+    "student_quest": true,
+    "tsubotomy": true,
+    "grades": true,
+    "portfolio": true,
+    "links": true,
     "record": true,
     "collection": true,
     "ranking": true,
@@ -38,6 +84,11 @@ CREATE TABLE IF NOT EXISTS public.class_app_features (
   menu_order jsonb NOT NULL DEFAULT '[
     "timer",
     "quest",
+    "student_quest",
+    "tsubotomy",
+    "grades",
+    "portfolio",
+    "links",
     "record",
     "collection",
     "ranking",
@@ -53,7 +104,12 @@ CREATE TABLE IF NOT EXISTS public.class_app_features (
 | key | 学生アプリのメニュー名 | 影響範囲（参考） |
 |---|---|---|
 | `timer` | 学習タイマー | タイマー画面・ストップウォッチ |
-| `quest` | クエスト | 問題クエスト一式 |
+| `quest` | ４択クエスト | 過去問・教員クエスト |
+| `student_quest` | 投稿問題 | 投稿・挑戦・いいね画面（Orenda実装済み） |
+| `tsubotomy` | ツボトミー | （画面未実装・メニュー表示のみ） |
+| `grades` | 成績 | （画面未実装・メニュー表示のみ） |
+| `portfolio` | ポートフォリオ | （画面未実装・メニュー表示のみ） |
+| `links` | 各種リンク | 外部リンク一覧画面（URLはOrenda側固定） |
 | `record` | 勉強時間 | 学習時間の振り返り |
 | `collection` | コレクション | カード / ガチャ / メダル |
 | `ranking` | 交流 | 勉強時間ランキング |
@@ -61,14 +117,14 @@ CREATE TABLE IF NOT EXISTS public.class_app_features (
 
 - 値は **boolean のみ**（`true` = 表示、`false` = 非表示）
 - 未知キーは無視、欠落キーは Orenda 側で `true` 扱い
-- 保存時は **6キーすべてを明示的に送る**こと
+- 保存時は **11キーすべてを明示的に送る**こと
 
-### `menu_order`（表示順）★追加
+### `menu_order`（表示順）
 
 - **feature key の JSON 配列**（上から順）
-- 既定: `["timer","quest","record","collection","ranking","mypage"]`
-- 例（クエストを最上段）: `["quest","timer","record","collection","ranking","mypage"]`
-- 保存時は **6キーすべてを重複なく含める**こと
+- 既定: `["timer","quest","student_quest","tsubotomy","grades","portfolio","links","record","collection","ranking","mypage"]`
+- 例（４択クエストを最上段）: `["quest","timer","student_quest","tsubotomy","grades","portfolio","links","record","collection","ranking","mypage"]`
+- 保存時は **11キーすべてを重複なく含める**こと
 - Orenda 側の挙動:
   - 未知キーは無視
   - 欠落キーは既定順で末尾に補完
@@ -81,8 +137,8 @@ CREATE TABLE IF NOT EXISTS public.class_app_features (
 INSERT INTO public.class_app_features (class_name, features, menu_order, updated_by)
 VALUES (
   '1年A',
-  '{"timer":true,"quest":true,"record":true,"collection":false,"ranking":false,"mypage":true}'::jsonb,
-  '["quest","timer","record","mypage","collection","ranking"]'::jsonb,
+  '{"timer":true,"quest":true,"student_quest":true,"tsubotomy":true,"grades":true,"portfolio":true,"links":true,"record":true,"collection":false,"ranking":false,"mypage":true}'::jsonb,
+  '["quest","timer","student_quest","tsubotomy","grades","portfolio","links","record","mypage","collection","ranking"]'::jsonb,
   'teacher@example.com'
 )
 ON CONFLICT (class_name) DO UPDATE
@@ -92,63 +148,59 @@ SET features = EXCLUDED.features,
     updated_by = EXCLUDED.updated_by;
 ```
 
-## UI 要件
+## UI 修正要件（既存画面がある場合）
 
-1. **クラス選択**
-   - 既存のクラス一覧があるならそれを使う
-   - 無ければ `students.class` の DISTINCT、または国家試験日程など既存のクラス名マスタと揃える
-   - 表示名と保存する `class_name` は同一文字列
+1. **機能トグルを11項目に拡張**
+   - 追加: 投稿問題 / ツボトミー / 成績 / ポートフォリオ / 各種リンク
+   - ラベル変更: クエスト → **４択クエスト**
+   - （旧ラベルがある場合）学生作成問題 → **投稿問題**、成績確認 → **成績**
+   - DB 読込時に新キーが欠落していたら UI 上は `true` として表示し、保存時に11キー揃えて書く
 
-2. **機能トグル（ON/OFF）**
-   - 上記6項目をトグル（スイッチ / チェックボックス）
-   - ラベルは教員向けに日本語（学習タイマー / クエスト / 勉強時間 / コレクション / 交流 / マイページ）
-   - 初期表示:
-     - DBに行があればその `features`
-     - 無ければデフォルト全 `true`
+2. **表示順リストも11項目に拡張**
+   - 既存 `menu_order` に新キーが無い場合は、既定順の位置（`quest` の直後に `student_quest` → `tsubotomy` → `grades` → `portfolio` → `links`）へ挿入して表示
+   - または既定順末尾に足してもよいが、**保存時は11キーすべてを重複なく含める**
 
-3. **表示順の編集（必須）**
-   - ドラッグ&ドロップ、上下ボタン、番号入力など、既存UIに合う方法で並び替え可能にする
-   - 表示ラベルは日本語、保存値は feature key（`timer` 等）
-   - OFFの項目も並び順リストに含めてよい（学生側では非表示になるだけ）
-   - 初期表示:
-     - DBに `menu_order` があればそれ
-     - 無ければ既定順 `timer → quest → record → collection → ranking → mypage`
+3. **定数・型・バリデーション**
+   - feature key 配列を6/9/10固定にしている箇所があれば11に更新
+   - 保存前バリデーション: 11キーすべて存在・boolean・`menu_order` は11キーの順列
 
-4. **保存**
-   - upsert（INSERT … ON CONFLICT DO UPDATE）
-   - `features` と `menu_order` を **同時に保存**
-   - `updated_at = now()`
-   - `updated_by` にはログイン中教員の識別子（メール等）
-   - 成功/失敗メッセージを出す
+4. **クラス選択・保存・権限・配置**は既存どおりでよい  
+   - upsert で `features` と `menu_order` を同時保存
+   - `updated_by` にログイン教員の識別子
 
-5. **配置**
-   - 既存の「クラス設定」「アプリ設定」「管理」系画面があればそこに追加
-   - 無ければ「学生アプリメニュー設定」のような独立ページで可
-   - 権限: 教員/管理者のみ
+## UI 要件（新規実装の場合）
+
+1. **クラス選択**（既存クラス一覧 or `students.class` の DISTINCT）
+2. **11項目の ON/OFF トグル**
+3. **11項目の表示順編集**（DnD / 上下ボタンなど）
+4. **保存**（上記 upsert）
+5. 教員/管理者のみアクセス可
 
 ## API / データアクセス方針
 
 - OrendaSchool の既存パターンに合わせる
 - 読み取り: `select class_name, features, menu_order, updated_at from class_app_features where class_name = ?`
-- 書き込み: 上記 upsert。`features` と `menu_order` は両方必須
-- `menu_order` カラムが無い場合は Orenda の `docs/sql/add-class-app-features-menu-order.sql` を実行するようエラーメッセージを出すと親切
+- 書き込み: 上記 upsert。`features` と `menu_order` は両方必須（11キー）
+- `menu_order` カラムが無い場合は Orenda の `docs/sql/add-class-app-features-menu-order.sql` を実行するよう案内
 - RLS がある場合は教員が upsert できるポリシーを既存方針に合わせる
 
 ## 受け入れ条件
 
-- [ ] クラスを選んで6機能のON/OFFを保存できる
-- [ ] クラスを選んでメニューの上からの表示順を変更・保存できる
+- [ ] トグルが11項目（学習タイマー / ４択クエスト / 投稿問題 / ツボトミー / 成績 / ポートフォリオ / 各種リンク / 勉強時間 / コレクション / 交流 / マイページ）
+- [ ] 旧「クエスト」ラベルが「４択クエスト」になっている（key は `quest` のまま）
+- [ ] 表示順も11項目で並び替え・保存できる
+- [ ] 既存DBに新キーが無いクラスでも、編集画面で新5項目が表示され、保存すると11キーが書き込まれる
 - [ ] 再表示で `features` / `menu_order` が復元される
-- [ ] 未設定クラスは UI 上デフォルト全ON・既定順
 - [ ] 保存後、同じクラスの学生が **再ログイン**すると Orenda のメニュー表示と並びが変わる
-- [ ] `class_name` が `students.class` と一致しないと効かないことを注意できると望ましい
 
 ## やらないこと
 
-- Orenda（学生アプリ）のコード変更（並び順対応は実装済み）
-- メニュー以外の機能制限（API強制拒否など）は今回スコープ外
-- 機能キーの追加・リネーム（Orenda と同期が必要なため、勝手に変えない）
+- Orenda（学生アプリ）のコード変更
+- メニュー以外の機能制限（API強制拒否など）
+- feature key の独自追加・リネーム（Orenda と同期が必要なため勝手に変えない）
 - 下部ナビの並び替え（ホームメニューのみ）
+- ツボトミー / 成績 / ポートフォリオの画面本体の実装（メニュー表示制御だけでよい）
+- 投稿問題の中身（投稿・挑戦・いいね）や各種リンクのURL編集（Orenda側実装済み。メニューON/OFF・並びのみ）
 
 ## 補足（Orenda 側の挙動）
 
@@ -156,10 +208,9 @@ SET features = EXCLUDED.features,
   - `student.appFeatures` … ON/OFF
   - `student.menuOrder` … 表示順配列
 - OFFのメニューはホームに出ない。下部ナビも ON/OFF は同様に隠す（並びは固定）
-- 無効画面にいる場合はメニューへ戻す
-- テーブル未作成・取得失敗時はログイン自体は成功し、全ON・既定順扱い
-- `menu_order` カラム未追加時もログインは成功し、既定順になる（`features` だけ読める場合は ON/OFF のみ反映）
+- 欠落キーは Orenda 側で `true`・既定順末尾に補完
+- テーブル未作成・取得失敗時はログイン成功＋全ON・既定順
 
 ---
 
-以上を、OrendaSchool の既存UI・認証・Supabaseアクセスパターンに合わせて実装してください。
+以上を、OrendaSchool の既存UI・認証・Supabaseアクセスパターンに合わせて実装（または既存メニュー設定画面を修正）してください。

@@ -7,6 +7,7 @@ import type { QuestAnswerLogEntry } from "@/lib/questDbTypes";
 import {
   getSelectableQuestQuestionCounts,
 } from "@/lib/questSubcategories";
+import { registerStudySession } from "@/lib/registerStudySession";
 import { createServiceRoleSupabaseClient } from "@/lib/supabaseServiceRole";
 import {
   appendTeacherQuestCompletion,
@@ -26,6 +27,12 @@ type QuestCompleteRequestBody = {
   questScope?: unknown;
   teacherQuestId?: unknown;
   answers?: unknown;
+  /** 科目クエストの解答にかかった秒数（教員・復習では無視） */
+  durationSeconds?: unknown;
+  /** @deprecated durationSeconds を優先。後方互換用 */
+  durationMinutes?: unknown;
+  /** study_sessions.subject_name 用（科目クエストのみ） */
+  subjectName?: unknown;
 };
 
 function parseSubcategoryIds(body: QuestCompleteRequestBody | null): string[] {
@@ -303,6 +310,35 @@ export async function POST(request: Request) {
       pointsEarned,
       answers,
     });
+
+    const durationSeconds =
+      typeof body?.durationSeconds === "number" ? body.durationSeconds : null;
+    const durationMinutes =
+      typeof body?.durationMinutes === "number" ? body.durationMinutes : null;
+    const subjectName =
+      typeof body?.subjectName === "string" ? body.subjectName.trim() : "";
+
+    // 教員クエスト・復習は対象外。科目クエストは1秒以上で学習時間に加算
+    if (subjectName.length > 0) {
+      const studyResult = await registerStudySession(supabase, {
+        gakuseiId: studentId,
+        subjectName,
+        ...(typeof durationSeconds === "number" &&
+        Number.isInteger(durationSeconds) &&
+        durationSeconds >= 1
+          ? { durationSeconds }
+          : typeof durationMinutes === "number" &&
+              Number.isInteger(durationMinutes) &&
+              durationMinutes >= 1
+            ? { durationMinutes }
+            : {}),
+      });
+
+      if (!studyResult.ok) {
+        console.error("[quest-complete] study_sessions:", studyResult.message);
+        // ポイント付与・解答履歴は成功済みのため、学習時間の失敗では全体を失敗にしない
+      }
+    }
   }
 
   if (questScope === "review" && questionCount !== null && answers.length > 0) {

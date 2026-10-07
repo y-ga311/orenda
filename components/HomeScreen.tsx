@@ -21,6 +21,9 @@ import seiriImage from "@/source-images/seiri.png";
 import souronImage from "@/source-images/souron.png";
 import tougaiImage from "@/source-images/tougai.png";
 import tourinImage from "@/source-images/tourin.png";
+import studentPortalLinkIcon from "@/source-images/resource-links/student-portal.png";
+import safetyLink24Icon from "@/source-images/resource-links/safety-link24.png";
+import clinicLinkIcon from "@/source-images/resource-links/clinic.png";
 import { getCardImage, TOTAL_CARD_COUNT } from "@/lib/cardImages";
 import { avatarIcons, getAvatarIcon, type AvatarIconId } from "@/lib/avatarIcons";
 import { GACHA_POINTS_PER_TEACHER_QUEST_CORRECT, GACHA_SPIN_COST_PT } from "@/lib/gachaConstants";
@@ -43,7 +46,6 @@ import {
   getQuestQuestionCountHint,
   getSelectableQuestQuestionCounts,
   normalizeSelectedQuestQuestionCount,
-  shouldShowQuestSubcategoryCountBadge,
   sumQuestSubcategoryQuestionCounts,
   type QuestQuestionCount,
 } from "@/lib/questSubcategories";
@@ -67,6 +69,7 @@ import {
   type TeacherQuestPhase,
 } from "@/components/TeacherQuestBattleScreen";
 import { useTeacherQuestTransition } from "@/components/TeacherQuestBattleTransition";
+import { PostedQuestionsScreen } from "@/components/PostedQuestionsScreen";
 import { useBottomNavVisibility } from "@/lib/useBottomNavVisibility";
 import {
   formatTeacherDisplayName,
@@ -92,9 +95,39 @@ const menuItems = [
   },
   {
     icon: "📚",
-    title: "クエスト",
-    description: "問題に取り組む",
+    title: "４択クエスト",
+    description: "過去問、教員クエスト",
     tone: "indigo",
+  },
+  {
+    icon: "✍️",
+    title: "投稿問題",
+    description: "投稿問題に挑戦",
+    tone: "teal",
+  },
+  {
+    icon: "📍",
+    title: "ツボトミー",
+    description: "３Dモデルで学習する",
+    tone: "orange",
+  },
+  {
+    icon: "📊",
+    title: "成績",
+    description: "模擬試験の成績を見る",
+    tone: "purple",
+  },
+  {
+    icon: "📁",
+    title: "ポートフォリオ",
+    description: "学習の成果をまとめる",
+    tone: "slate",
+  },
+  {
+    icon: "🔗",
+    title: "各種リンク",
+    description: "学校・学習のリンク集",
+    tone: "cyan",
   },
   {
     icon: "📝",
@@ -121,6 +154,27 @@ const menuItems = [
     tone: "blue",
   },
 ];
+
+const resourceLinks = [
+  {
+    title: "学生ポータル",
+    description: "学内ポータルへアクセス",
+    href: "https://j2.jgx.jp/PortalManagementWeb/html/login.html?lsc=TOY",
+    icon: studentPortalLinkIcon,
+  },
+  {
+    title: "緊急通報・安否確認システム",
+    description: "緊急時の通報・安否確認",
+    href: "https://jikeigroup.safetylink24.jp/",
+    icon: safetyLink24Icon,
+  },
+  {
+    title: "附属鍼灸院",
+    description: "附属鍼灸院の予約",
+    href: "https://kenkounihari.seirin.jp/clinic/14531/reserve?staffMode=false&options=",
+    icon: clinicLinkIcon,
+  },
+] as const;
 
 const studySubjects = [
   { id: "kaibou", title: "解剖学", subjectName: "解剖学", image: kaibouImage },
@@ -241,15 +295,46 @@ type StudyRecordData = {
   };
 };
 
+type FollowRelation = "none" | "following" | "follower" | "mutual";
+
 type StudyRankingItem = {
   avatarIconId: string;
   className: string | null;
   displayName: string;
+  followRelation?: FollowRelation | null;
   gakuseiId: string;
   isCurrentUser: boolean;
   note: string;
   rank: number | null;
   totalMinutes: number;
+};
+
+type FriendProfileData = {
+  friend: {
+    avatarIconId: string;
+    className: string | null;
+    displayName: string;
+    gakuseiId: string;
+  };
+  study: {
+    subjects: Array<{
+      minutes: number;
+      percentage: number;
+      subjectName: string;
+    }>;
+    totalMinutes: number;
+  };
+  medals: StudentMedalItem[];
+  ownedCardNos: number[];
+  cardTotal: number;
+};
+
+type StudentSearchResult = {
+  avatarIconId: string;
+  className: string | null;
+  displayName: string;
+  followRelation: FollowRelation;
+  gakuseiId: string;
 };
 
 const rankingPeriodOptions = [
@@ -287,18 +372,28 @@ type StudyRankingData = {
 };
 
 function formatStudyMinutes(minutes: number) {
-  const hours = Math.floor(minutes / 60);
-  const restMinutes = minutes % 60;
+  const totalSeconds = Math.max(0, Math.round(minutes * 60));
+  const hours = Math.floor(totalSeconds / 3600);
+  const restMinutes = Math.floor((totalSeconds % 3600) / 60);
+  const restSeconds = totalSeconds % 60;
 
-  if (hours === 0) {
-    return `${restMinutes}分`;
+  if (hours === 0 && restMinutes === 0) {
+    return `${restSeconds}秒`;
   }
 
-  if (restMinutes === 0) {
+  if (hours === 0) {
+    return restSeconds > 0 ? `${restMinutes}分${restSeconds}秒` : `${restMinutes}分`;
+  }
+
+  if (restMinutes === 0 && restSeconds === 0) {
     return `${hours}時間`;
   }
 
-  return `${hours}時間${restMinutes}分`;
+  if (restSeconds === 0) {
+    return `${hours}時間${restMinutes}分`;
+  }
+
+  return `${hours}時間${restMinutes}分${restSeconds}秒`;
 }
 
 function buildStudyPieGradient(
@@ -479,6 +574,9 @@ export function HomeScreen() {
     QuestSessionQuestion[]
   >([]);
   const [questAnswerLog, setQuestAnswerLog] = useState<QuestAnswerLogEntry[]>([]);
+  /** クエスト開始時刻（ms）。科目は学習時間加算にも使用。教員バトルでは未設定 */
+  const [questStartedAtMs, setQuestStartedAtMs] = useState<number | null>(null);
+  const [questElapsedSeconds, setQuestElapsedSeconds] = useState(0);
   const [isQuestSetupLoading, setIsQuestSetupLoading] = useState(false);
   const [isQuestStarting, setIsQuestStarting] = useState(false);
   const [questSetupMessage, setQuestSetupMessage] = useState("");
@@ -533,6 +631,8 @@ export function HomeScreen() {
     | "gacha"
     | "mypage"
     | "quest"
+    | "links"
+    | "student_quest"
   >("menu");
   const [stopwatchReturnScreen, setStopwatchReturnScreen] = useState<"timer" | "quest">(
     "timer",
@@ -572,6 +672,21 @@ export function HomeScreen() {
     useState<RankingPeriod>("week");
   const [isStudySummaryLoading, setIsStudySummaryLoading] = useState(false);
   const [isStudyRankingLoading, setIsStudyRankingLoading] = useState(false);
+  const [followActionTargetId, setFollowActionTargetId] = useState<string | null>(
+    null,
+  );
+  const [followActionMessage, setFollowActionMessage] = useState("");
+  const [selectedFriendId, setSelectedFriendId] = useState<string | null>(null);
+  const [friendProfile, setFriendProfile] = useState<FriendProfileData | null>(null);
+  const [isFriendProfileLoading, setIsFriendProfileLoading] = useState(false);
+  const [friendProfileMessage, setFriendProfileMessage] = useState("");
+  const [studentSearchQuery, setStudentSearchQuery] = useState("");
+  const [studentSearchResults, setStudentSearchResults] = useState<
+    StudentSearchResult[]
+  >([]);
+  const [isStudentSearching, setIsStudentSearching] = useState(false);
+  const [studentSearchMessage, setStudentSearchMessage] = useState("");
+  const [hasStudentSearched, setHasStudentSearched] = useState(false);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [isStopwatchRunning, setIsStopwatchRunning] = useState(false);
   const [stopwatchMessage, setStopwatchMessage] = useState("");
@@ -611,6 +726,30 @@ export function HomeScreen() {
       setActiveScreen("menu");
     }
   }, [activeScreen, appFeatures, isLoggedInPreview]);
+
+  useEffect(() => {
+    if (
+      !isLoggedInPreview ||
+      activeScreen !== "quest" ||
+      questView !== "question" ||
+      questStartedAtMs == null
+    ) {
+      return;
+    }
+
+    const tick = () => {
+      setQuestElapsedSeconds(
+        Math.max(0, Math.floor((Date.now() - questStartedAtMs) / 1000)),
+      );
+    };
+
+    tick();
+    const intervalId = window.setInterval(tick, 1000);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [activeScreen, isLoggedInPreview, questStartedAtMs, questView]);
 
   useEffect(() => {
     if (!isLoggedInPreview || activeScreen !== "timer") {
@@ -854,6 +993,59 @@ export function HomeScreen() {
     recordCalendarMonth.year,
     selectedRecordPeriod,
   ]);
+
+  useEffect(() => {
+    if (!isLoggedInPreview || activeScreen !== "ranking") {
+      return;
+    }
+
+    const friendId = selectedFriendId;
+    if (!friendId) {
+      return;
+    }
+
+    let isMounted = true;
+
+    async function loadFriendProfile() {
+      setIsFriendProfileLoading(true);
+      setFriendProfileMessage("");
+      setFriendProfile(null);
+
+      const response = await fetch(
+        `/api/friends/${encodeURIComponent(friendId)}`,
+      ).catch(() => null);
+
+      if (!isMounted) {
+        return;
+      }
+
+      setIsFriendProfileLoading(false);
+
+      if (!response?.ok) {
+        const result = (await response?.json().catch(() => null)) as {
+          message?: string;
+        } | null;
+        setFriendProfileMessage(
+          result?.message ?? "ともだちの情報を取得できませんでした。",
+        );
+        return;
+      }
+
+      const result = (await response.json().catch(() => null)) as FriendProfileData | null;
+      if (!result?.friend) {
+        setFriendProfileMessage("ともだちの情報を取得できませんでした。");
+        return;
+      }
+
+      setFriendProfile(result);
+    }
+
+    void loadFriendProfile();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [activeScreen, isLoggedInPreview, selectedFriendId]);
 
   useEffect(() => {
     if (!isLoggedInPreview || activeScreen !== "ranking") {
@@ -1153,6 +1345,17 @@ export function HomeScreen() {
     });
     setStudyRecord(null);
     setStudyRanking(null);
+    setFollowActionTargetId(null);
+    setFollowActionMessage("");
+    setSelectedFriendId(null);
+    setFriendProfile(null);
+    setIsFriendProfileLoading(false);
+    setFriendProfileMessage("");
+    setStudentSearchQuery("");
+    setStudentSearchResults([]);
+    setIsStudentSearching(false);
+    setStudentSearchMessage("");
+    setHasStudentSearched(false);
     setSelectedRecordPeriod("month");
     setSelectedRankingPeriod("week");
     setRecordCalendarMonth(getCurrentJapanYearMonth());
@@ -1180,6 +1383,8 @@ export function HomeScreen() {
     setQuestSetupSubcategories([]);
     setQuestSessionQuestions([]);
     setQuestAnswerLog([]);
+    setQuestStartedAtMs(null);
+    setQuestElapsedSeconds(0);
     setIsQuestSetupLoading(false);
     setIsQuestStarting(false);
     setQuestSetupMessage("");
@@ -1213,6 +1418,8 @@ export function HomeScreen() {
     setQuestSetupSubcategories([]);
     setQuestSessionQuestions([]);
     setQuestAnswerLog([]);
+    setQuestStartedAtMs(null);
+    setQuestElapsedSeconds(0);
     setIsQuestSetupLoading(false);
     setIsQuestStarting(false);
     setQuestSetupMessage("");
@@ -1227,6 +1434,144 @@ export function HomeScreen() {
   function returnToQuestSelect() {
     setQuestView("select");
     setQuestSelectDataVersion((current) => current + 1);
+  }
+
+  function getFollowActionLabel(relation: FollowRelation | null | undefined) {
+    switch (relation) {
+      case "mutual":
+        return "詳細";
+      case "following":
+        return "フォロー中";
+      case "follower":
+        return "フォローバック";
+      default:
+        return "フォロー";
+    }
+  }
+
+  function updateFollowRelationEverywhere(
+    targetGakuseiId: string,
+    followRelation: FollowRelation,
+  ) {
+    setStudyRanking((current) => {
+      if (!current) {
+        return current;
+      }
+
+      return {
+        ...current,
+        ranking: current.ranking.map((item) =>
+          item.gakuseiId === targetGakuseiId
+            ? { ...item, followRelation }
+            : item,
+        ),
+      };
+    });
+
+    setStudentSearchResults((current) =>
+      current.map((item) =>
+        item.gakuseiId === targetGakuseiId ? { ...item, followRelation } : item,
+      ),
+    );
+  }
+
+  async function searchStudents(event?: FormEvent<HTMLFormElement>) {
+    event?.preventDefault();
+    const query = studentSearchQuery.trim();
+
+    if (query.length < 1) {
+      setStudentSearchMessage("ニックネームまたは学籍IDを入力してください。");
+      setStudentSearchResults([]);
+      setHasStudentSearched(false);
+      return;
+    }
+
+    setIsStudentSearching(true);
+    setStudentSearchMessage("");
+    setHasStudentSearched(true);
+
+    const response = await fetch(
+      `/api/students/search?q=${encodeURIComponent(query)}`,
+    ).catch(() => null);
+
+    setIsStudentSearching(false);
+
+    if (!response?.ok) {
+      const result = (await response?.json().catch(() => null)) as {
+        message?: string;
+      } | null;
+      setStudentSearchResults([]);
+      setStudentSearchMessage(result?.message ?? "検索に失敗しました。");
+      return;
+    }
+
+    const result = (await response.json().catch(() => null)) as {
+      students?: StudentSearchResult[];
+      message?: string;
+    } | null;
+
+    setStudentSearchResults(result?.students ?? []);
+    setStudentSearchMessage(
+      (result?.students?.length ?? 0) === 0
+        ? result?.message ?? "該当する学生が見つかりませんでした。"
+        : "",
+    );
+  }
+
+  async function handleFollowAction(
+    targetGakuseiId: string,
+    currentRelation: FollowRelation | null | undefined,
+  ) {
+    if (followActionTargetId) {
+      return;
+    }
+
+    setFollowActionMessage("");
+
+    if (currentRelation === "mutual") {
+      setSelectedFriendId(targetGakuseiId);
+      return;
+    }
+
+    setFollowActionTargetId(targetGakuseiId);
+
+    const shouldUnfollow = currentRelation === "following";
+    const response = await fetch(
+      shouldUnfollow
+        ? `/api/follows?targetGakuseiId=${encodeURIComponent(targetGakuseiId)}`
+        : "/api/follows",
+      shouldUnfollow
+        ? { method: "DELETE" }
+        : {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ targetGakuseiId }),
+          },
+    ).catch(() => null);
+
+    setFollowActionTargetId(null);
+
+    if (!response?.ok) {
+      const result = (await response?.json().catch(() => null)) as {
+        message?: string;
+      } | null;
+      setFollowActionMessage(
+        result?.message ??
+          (shouldUnfollow
+            ? "フォロー解除に失敗しました。"
+            : "フォローに失敗しました。"),
+      );
+      return;
+    }
+
+    const result = (await response.json().catch(() => null)) as {
+      followRelation?: FollowRelation;
+    } | null;
+
+    updateFollowRelationEverywhere(
+      targetGakuseiId,
+      result?.followRelation ?? (shouldUnfollow ? "none" : "following"),
+    );
   }
 
   const navigateToTimer = useCallback(() => {
@@ -1262,6 +1607,9 @@ export function HomeScreen() {
     if (!isScreenEnabled(appFeatures, "ranking")) {
       return;
     }
+    setSelectedFriendId(null);
+    setFriendProfile(null);
+    setFriendProfileMessage("");
     setActiveScreen("ranking");
   }, [appFeatures]);
 
@@ -1369,6 +1717,8 @@ export function HomeScreen() {
     setQuestAnswerLog([]);
     setIsQuestCompleting(false);
     setQuestCompleteMessage("");
+    setQuestElapsedSeconds(0);
+    setQuestStartedAtMs(Date.now());
     setQuestView("question");
   }
 
@@ -1438,6 +1788,8 @@ export function HomeScreen() {
       setQuestAnswerLog([]);
       setIsQuestCompleting(false);
       setQuestCompleteMessage("");
+      setQuestStartedAtMs(null);
+      setQuestElapsedSeconds(0);
       setQuestSetupSubcategories([]);
       setIsQuestSetupLoading(false);
       setIsQuestStarting(false);
@@ -1515,6 +1867,8 @@ export function HomeScreen() {
       setQuestAnswerLog([]);
       setIsQuestCompleting(false);
       setQuestCompleteMessage("");
+      setQuestElapsedSeconds(0);
+      setQuestStartedAtMs(Date.now());
       setQuestSetupSubcategories([]);
       setIsQuestSetupLoading(false);
       setIsQuestStarting(false);
@@ -1533,6 +1887,16 @@ export function HomeScreen() {
     setIsQuestCompleting(true);
     setQuestCompleteMessage("");
 
+    const questScope = isTeacherQuest
+      ? "teacher"
+      : isReviewQuest
+        ? "review"
+        : "subject";
+    const subjectDurationSeconds =
+      questScope === "subject" && questStartedAtMs != null
+        ? Math.max(0, Math.floor((Date.now() - questStartedAtMs) / 1000))
+        : null;
+
     const response = await fetch("/api/quest-complete", {
       method: "POST",
       headers: {
@@ -1541,7 +1905,7 @@ export function HomeScreen() {
       body: JSON.stringify({
         correctCount: questCorrectCount,
         questionCount: selectedQuestQuestionCount,
-        questScope: isTeacherQuest ? "teacher" : isReviewQuest ? "review" : "subject",
+        questScope,
         ...(isTeacherQuest
           ? {
               teacherQuestId,
@@ -1555,6 +1919,10 @@ export function HomeScreen() {
                   subjectId: selectedQuestSubject.id,
                   subcategoryIds: selectedQuestSubcategoryIds,
                   answers: questAnswerLog,
+                  subjectName: selectedQuestSubject.subjectName,
+                  ...(subjectDurationSeconds != null && subjectDurationSeconds >= 1
+                    ? { durationSeconds: subjectDurationSeconds }
+                    : {}),
                 }),
       }),
     }).catch(() => null);
@@ -1579,6 +1947,8 @@ export function HomeScreen() {
     setSelectedQuestChoice(null);
     setQuestAnswerSubmitted(false);
     setQuestCompleteMessage("");
+    setQuestStartedAtMs(null);
+    setQuestElapsedSeconds(0);
     setQuestView("result");
   }
 
@@ -2313,15 +2683,25 @@ export function HomeScreen() {
             </header>
 
             <div className="questQuestionMain">
-              <p className="questQuestionProgress" aria-live="polite">
-                {isTeacherQuest && teacherQuestMeta ? (
-                  <>
-                    {teacherQuestMeta.teacherName}
-                    <br />
-                  </>
+              <div className="questQuestionMeta">
+                <p className="questQuestionProgress" aria-live="polite">
+                  {isTeacherQuest && teacherQuestMeta ? (
+                    <>
+                      {teacherQuestMeta.teacherName}
+                      <br />
+                    </>
+                  ) : null}
+                  問{questionNumber}/{selectedQuestQuestionCount}
+                </p>
+                {questStartedAtMs != null ? (
+                  <p className="questElapsedTime" aria-label="解答時間">
+                    <span className="questElapsedTimeLabel">解答時間</span>
+                    <time className="questElapsedTimeValue" dateTime={`PT${questElapsedSeconds}S`}>
+                      {formatStopwatchTime(questElapsedSeconds)}
+                    </time>
+                  </p>
                 ) : null}
-                問{questionNumber}/{selectedQuestQuestionCount}
-              </p>
+              </div>
 
               <article className="questQuestionCard" aria-labelledby="quest-question-label">
                 <p className="questQuestionNumber" id="quest-question-label">
@@ -2724,13 +3104,11 @@ export function HomeScreen() {
                           <span className="questSubcategoryUnavailable">
                             問題未登録
                           </span>
-                        ) : shouldShowQuestSubcategoryCountBadge(
-                          subcategory.questionCount,
-                        ) ? (
+                        ) : (
                           <span className="questSubcategoryCount">
-                            全{subcategory.questionCount}問
+                            {subcategory.questionCount}問
                           </span>
-                        ) : null}
+                        )}
                       </label>
                       );
                     })}
@@ -3432,6 +3810,150 @@ export function HomeScreen() {
     const rankingRewardInfo = studyRanking?.rewardInfo ?? null;
     const latestRankingGrant = rankingRewardInfo?.recentGrants[0] ?? null;
 
+    if (selectedFriendId) {
+      const friendAvatar = friendProfile
+        ? getAvatarIcon(friendProfile.friend.avatarIconId)
+        : null;
+      const unlockedMedals = (friendProfile?.medals ?? []).map((medal) => ({
+        ...medal,
+        image: getMedalImage(medal.imageKey, medal.medalNo),
+      }));
+
+      return (
+        <main className="appShell">
+          <section
+            className="phoneFrame rankingScreen"
+            aria-label="ともだちプロフィール"
+            style={{ backgroundImage: `url(${backgroundImage.src})` }}
+          >
+            <header className="timerHeader">
+              <button
+                className="timerBackButton"
+                type="button"
+                onClick={() => {
+                  setSelectedFriendId(null);
+                  setFriendProfile(null);
+                  setFriendProfileMessage("");
+                }}
+              >
+                <span aria-hidden="true">‹</span>
+                戻る
+              </button>
+              <h1>ともだち</h1>
+              <span className="timerHeaderBalance" aria-hidden="true" />
+            </header>
+
+            <div ref={bindBottomNavScrollRef} className="rankingContent friendProfileContent">
+              {isFriendProfileLoading ? (
+                <p className="rankingEmptyText">読み込んでいます。</p>
+              ) : null}
+
+              {!isFriendProfileLoading && friendProfileMessage ? (
+                <p className="rankingEmptyText" role="alert">
+                  {friendProfileMessage}
+                </p>
+              ) : null}
+
+              {!isFriendProfileLoading && friendProfile && friendAvatar ? (
+                <>
+                  <section className="friendProfileHeader" aria-label="プロフィール">
+                    <Image
+                      src={friendAvatar.image}
+                      alt=""
+                      className="friendProfileAvatar"
+                      aria-hidden="true"
+                    />
+                    <h2>{friendProfile.friend.displayName}</h2>
+                    <p>{friendProfile.friend.className ?? "クラス未設定"}</p>
+                    <p className="friendProfileMutualBadge">相互フォロー</p>
+                  </section>
+
+                  <section className="friendProfileSection" aria-label="科目別勉強時間">
+                    <h3>勉強時間（科目別）</h3>
+                    <p className="friendProfileTotal">
+                      合計 {formatStudyMinutes(friendProfile.study.totalMinutes)}
+                    </p>
+                    {friendProfile.study.subjects.length === 0 ? (
+                      <p className="rankingEmptyText">まだ勉強記録がありません。</p>
+                    ) : (
+                      <ul className="friendSubjectList">
+                        {friendProfile.study.subjects.map((subject) => (
+                          <li key={subject.subjectName}>
+                            <span>{subject.subjectName}</span>
+                            <strong>{formatStudyMinutes(subject.minutes)}</strong>
+                            <em>{subject.percentage}%</em>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </section>
+
+                  <section className="friendProfileSection" aria-label="達成メダル">
+                    <h3>
+                      メダル {unlockedMedals.length}個
+                    </h3>
+                    {unlockedMedals.length === 0 ? (
+                      <p className="rankingEmptyText">まだメダルを獲得していません。</p>
+                    ) : (
+                      <div className="friendMedalGrid">
+                        {unlockedMedals.map((medal) => (
+                          <article className="friendMedalItem" key={medal.id}>
+                            <Image
+                              src={medal.image}
+                              alt=""
+                              className="friendMedalImage"
+                              aria-hidden="true"
+                            />
+                            <p>{medal.title}</p>
+                          </article>
+                        ))}
+                      </div>
+                    )}
+                  </section>
+
+                  <section className="friendProfileSection" aria-label="所持カード">
+                    <h3>
+                      カード {friendProfile.ownedCardNos.length}/
+                      {friendProfile.cardTotal}
+                    </h3>
+                    {friendProfile.ownedCardNos.length === 0 ? (
+                      <p className="rankingEmptyText">まだカードを持っていません。</p>
+                    ) : (
+                      <div className="friendCardGrid">
+                        {friendProfile.ownedCardNos.map((cardNo) => (
+                          <Image
+                            key={cardNo}
+                            src={getCardImage(cardNo)}
+                            alt={`カード ${cardNo}`}
+                            className="friendCardImage"
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </section>
+                </>
+              ) : null}
+            </div>
+
+            <TimerBottomNav
+              activeTab="ranking"
+              visible={bottomNavVisible}
+              onSelectTimer={navigateToTimer}
+              onSelectQuest={navigateToQuest}
+              onSelectRecord={navigateToRecord}
+              onSelectCollection={navigateToCollection}
+              onSelectRanking={() => {
+                setSelectedFriendId(null);
+                setFriendProfile(null);
+                navigateToRanking();
+              }}
+              enabledFeatures={appFeatures}
+            />
+          </section>
+        </main>
+      );
+    }
+
     return (
       <main className="appShell">
         <section
@@ -3448,7 +3970,7 @@ export function HomeScreen() {
               <span aria-hidden="true">‹</span>
               戻る
             </button>
-            <h1>学習ランキング</h1>
+            <h1>交流</h1>
             <span className="timerHeaderBalance" aria-hidden="true" />
           </header>
 
@@ -3458,7 +3980,7 @@ export function HomeScreen() {
               <p>
                 {studyRanking?.range?.label
                   ? `集計期間: ${studyRanking.range.label}`
-                  : "他のユーザーの学習量をチェックしよう"}
+                  : "フォローして相互になると詳細が見られます"}
               </p>
               {rankingRewardInfo ? (
                 <div className="rankingRewardBanner" aria-label="ランキング報酬">
@@ -3497,6 +4019,92 @@ export function HomeScreen() {
               </div>
             </section>
 
+            <section className="studentSearchCard" aria-label="学生検索">
+              <h2>学生を探す</h2>
+              <p>ニックネームまたは学籍IDで検索できます</p>
+              <form className="studentSearchForm" onSubmit={searchStudents}>
+                <input
+                  className="studentSearchInput"
+                  type="search"
+                  name="studentSearch"
+                  value={studentSearchQuery}
+                  placeholder="例: たろう / A123"
+                  autoComplete="off"
+                  enterKeyHint="search"
+                  onChange={(event) => setStudentSearchQuery(event.target.value)}
+                />
+                <button
+                  className="studentSearchButton"
+                  type="submit"
+                  disabled={isStudentSearching}
+                >
+                  {isStudentSearching ? "..." : "検索"}
+                </button>
+              </form>
+
+              {studentSearchMessage ? (
+                <p className="rankingEmptyText" role="status">
+                  {studentSearchMessage}
+                </p>
+              ) : null}
+
+              {followActionMessage && studentSearchResults.length > 0 ? (
+                <p className="rankingEmptyText" role="alert">
+                  {followActionMessage}
+                </p>
+              ) : null}
+
+              {studentSearchResults.map((item) => {
+                const avatar = getAvatarIcon(item.avatarIconId);
+                const relation = item.followRelation ?? "none";
+
+                return (
+                  <article className="studentSearchItem" key={item.gakuseiId}>
+                    <Image
+                      src={avatar.image}
+                      alt=""
+                      className="rankingAvatar"
+                      aria-hidden="true"
+                    />
+                    <div className="rankingMeta">
+                      <h3>{item.displayName}</h3>
+                      <p>
+                        {item.className ?? "クラス未設定"}
+                        {relation === "mutual" ? "・相互フォロー" : ""}
+                      </p>
+                    </div>
+                    <button
+                      className={
+                        relation === "mutual"
+                          ? "rankingFollowButton rankingFollowButtonMutual"
+                          : relation === "following"
+                            ? "rankingFollowButton rankingFollowButtonFollowing"
+                            : "rankingFollowButton"
+                      }
+                      type="button"
+                      disabled={followActionTargetId === item.gakuseiId}
+                      onClick={() =>
+                        void handleFollowAction(item.gakuseiId, relation)
+                      }
+                    >
+                      {followActionTargetId === item.gakuseiId
+                        ? "..."
+                        : getFollowActionLabel(relation)}
+                    </button>
+                  </article>
+                );
+              })}
+
+              {hasStudentSearched &&
+              !isStudentSearching &&
+              !studentSearchMessage &&
+              studentSearchResults.length === 0 ? (
+                <p className="rankingEmptyText">
+                  該当する学生が見つかりませんでした。
+                </p>
+              ) : null}
+            </section>
+
             <section className="rankingCurrentCard" aria-label="あなたのランキング">
               <h2>あなたの順位</h2>
               {currentRankingItem ? (
@@ -3526,6 +4134,11 @@ export function HomeScreen() {
 
             <section className="rankingList" aria-label="上位10名ランキング">
               <h2>上位10名</h2>
+              {followActionMessage ? (
+                <p className="rankingEmptyText" role="alert">
+                  {followActionMessage}
+                </p>
+              ) : null}
               {isStudyRankingLoading ? (
                 <p className="rankingEmptyText">ランキングを読み込んでいます。</p>
               ) : null}
@@ -3538,10 +4151,15 @@ export function HomeScreen() {
 
               {rankingItems.map((item) => {
                 const avatar = getAvatarIcon(item.avatarIconId);
+                const relation = item.followRelation ?? "none";
 
                 return (
                   <article
-                    className="rankingItem"
+                    className={
+                      item.isCurrentUser
+                        ? "rankingItem rankingItemCurrent"
+                        : "rankingItem rankingItemWithFollow"
+                    }
                     key={item.gakuseiId}
                   >
                     <span className={`rankingRank rankingRank-${item.rank}`}>
@@ -3557,10 +4175,34 @@ export function HomeScreen() {
                       <h3>{item.displayName}</h3>
                       <p>
                         {item.className ?? "クラス未設定"}・
-                        {item.isCurrentUser ? "あなた" : item.note}
+                        {item.isCurrentUser
+                          ? "あなた"
+                          : relation === "mutual"
+                            ? "相互フォロー"
+                            : item.note}
                       </p>
                     </div>
                     <strong>{formatStudyMinutes(item.totalMinutes)}</strong>
+                    {!item.isCurrentUser ? (
+                      <button
+                        className={
+                          relation === "mutual"
+                            ? "rankingFollowButton rankingFollowButtonMutual"
+                            : relation === "following"
+                              ? "rankingFollowButton rankingFollowButtonFollowing"
+                              : "rankingFollowButton"
+                        }
+                        type="button"
+                        disabled={followActionTargetId === item.gakuseiId}
+                        onClick={() =>
+                          void handleFollowAction(item.gakuseiId, relation)
+                        }
+                      >
+                        {followActionTargetId === item.gakuseiId
+                          ? "..."
+                          : getFollowActionLabel(relation)}
+                      </button>
+                    ) : null}
                   </article>
                 );
               })}
@@ -3821,19 +4463,35 @@ export function HomeScreen() {
                             className={`medalCell${medal.unlocked ? "" : " medalCell--locked"}`}
                             key={medal.id}
                             role="listitem"
+                            aria-label={
+                              medal.classUnlockPercent != null
+                                ? `${medal.title}、同じクラスの${medal.classUnlockPercent}%が取得`
+                                : medal.title
+                            }
                           >
-                            <div className="medalRingWrap" aria-hidden="true">
-                              <div className="medalRingInner">
-                                <div className="medalThumbClip">
-                                  <Image
-                                    src={medal.image}
-                                    alt=""
-                                    className="medalBadgeThumb"
-                                    fill
-                                    sizes="(max-width: 430px) 31vw, 116px"
-                                  />
+                            <div className="medalRingStage">
+                              <div className="medalRingWrap" aria-hidden="true">
+                                <div className="medalRingInner">
+                                  <div className="medalThumbClip">
+                                    <Image
+                                      src={medal.image}
+                                      alt=""
+                                      className="medalBadgeThumb"
+                                      fill
+                                      sizes="(max-width: 430px) 31vw, 116px"
+                                    />
+                                  </div>
                                 </div>
                               </div>
+                              {medal.classUnlockPercent != null ? (
+                                <span
+                                  className="medalClassRate"
+                                  title={`同じクラスの${medal.classUnlockPercent}%が取得`}
+                                  aria-hidden="true"
+                                >
+                                  {medal.classUnlockPercent}%
+                                </span>
+                              ) : null}
                             </div>
                             <p
                               className={
@@ -3998,6 +4656,74 @@ export function HomeScreen() {
     );
   }
 
+  if (isLoggedInPreview && activeScreen === "student_quest") {
+    return (
+      <PostedQuestionsScreen
+        backgroundImageSrc={backgroundImage.src}
+        onBack={() => setActiveScreen("menu")}
+      />
+    );
+  }
+
+  if (isLoggedInPreview && activeScreen === "links") {
+    return (
+      <main className="appShell">
+        <section
+          className="phoneFrame timerScreen"
+          aria-label="各種リンク"
+          style={{ backgroundImage: `url(${backgroundImage.src})` }}
+        >
+          <header className="timerHeader">
+            <button
+              className="timerBackButton"
+              type="button"
+              onClick={() => setActiveScreen("menu")}
+            >
+              <span aria-hidden="true">‹</span>
+              戻る
+            </button>
+            <h1>各種リンク</h1>
+            <span className="timerHeaderBalance" aria-hidden="true" />
+          </header>
+
+          <div className="timerContent resourceLinksContent">
+            <p className="resourceLinksLead">
+              外部サイトが開きます。必要に応じてログインしてください。
+            </p>
+            <nav className="menuList resourceLinksList" aria-label="各種リンク一覧">
+              {resourceLinks.map((link) => (
+                <a
+                  className="menuItem resourceLinkItem"
+                  key={link.href}
+                  href={link.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <span className="menuIcon resourceLinkIcon" aria-hidden="true">
+                    <Image
+                      src={link.icon}
+                      alt=""
+                      className="resourceLinkIconImage"
+                      width={44}
+                      height={44}
+                    />
+                  </span>
+                  <span className="menuText">
+                    <span className="menuTitle">{link.title}</span>
+                    <span className="menuDescription">{link.description}</span>
+                  </span>
+                  <span className="menuChevron" aria-hidden="true">
+                    ↗
+                  </span>
+                </a>
+              ))}
+            </nav>
+          </div>
+        </section>
+      </main>
+    );
+  }
+
   if (isLoggedInPreview) {
     return (
       <main className="appShell">
@@ -4076,9 +4802,17 @@ export function HomeScreen() {
                     setActiveScreen("mypage");
                   }
 
-                  if (item.title === "クエスト") {
+                  if (item.title === "４択クエスト") {
                     resetQuestScreen();
                     setActiveScreen("quest");
+                  }
+
+                  if (item.title === "各種リンク") {
+                    setActiveScreen("links");
+                  }
+
+                  if (item.title === "投稿問題") {
+                    setActiveScreen("student_quest");
                   }
                 }}
               >

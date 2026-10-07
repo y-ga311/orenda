@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import {
   buildStudentMedalList,
+  fetchClassMedalUnlockRates,
   fetchMedalAchievements,
   fetchStudentMedalGrantIds,
 } from "@/lib/medalDb";
@@ -47,12 +48,31 @@ export async function GET() {
     return NextResponse.json({ message: grantsError }, { status: 500 });
   }
 
-  const medals = buildStudentMedalList(achievements, grantsByAchievementId);
+  const {
+    ratesByAchievementId,
+    classStudentCount,
+    error: ratesError,
+  } = await fetchClassMedalUnlockRates(
+    supabase,
+    studentId,
+    achievements.map((achievement) => achievement.id),
+  );
+
+  if (ratesError) {
+    console.error("[medals] class rates:", ratesError);
+  }
+
+  const medals = buildStudentMedalList(
+    achievements,
+    grantsByAchievementId,
+    ratesError ? undefined : ratesByAchievementId,
+  );
   const unlockedCount = medals.filter((medal) => medal.unlocked).length;
 
   return NextResponse.json({
     medals,
     unlockedCount,
     totalCount: medals.length,
+    classStudentCount: ratesError ? 0 : classStudentCount,
   });
 }

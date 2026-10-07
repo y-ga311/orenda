@@ -21,6 +21,8 @@ export type StudentMedalItem = {
   imageKey: string;
   unlocked: boolean;
   grantedAt: string | null;
+  /** 同じクラスの学生のうち、このメダルを取得している割合（0–100）。クラス未設定時は null */
+  classUnlockPercent: number | null;
 };
 
 type StudentMedalGrantRow = {
@@ -126,9 +128,12 @@ export async function fetchStudentMedalGrantIds(
 export function buildStudentMedalList(
   achievements: readonly MedalAchievementRow[],
   grantsByAchievementId: ReadonlyMap<string, string>,
+  classUnlockPercentByAchievementId?: ReadonlyMap<string, number>,
 ): StudentMedalItem[] {
   return achievements.map((achievement) => {
     const grantedAt = grantsByAchievementId.get(achievement.id) ?? null;
+    const classUnlockPercent =
+      classUnlockPercentByAchievementId?.get(achievement.id) ?? null;
 
     return {
       id: achievement.id,
@@ -139,6 +144,113 @@ export function buildStudentMedalList(
       imageKey: `${achievement.medal_no}${achievement.tier}`,
       unlocked: grantedAt !== null,
       grantedAt,
+      classUnlockPercent,
     };
   });
+}
+
+/**
+ * ログイン学生と同じ class の学生について、各メダルの取得率（%）を返す。
+ * クラス未設定・同学級0人のときは空 Map。
+ */
+export async function fetchClassMedalUnlockRates(
+  supabase: SupabaseClient,
+  gakuseiId: string,
+  achievementIds: readonly string[],
+): Promise<{
+  ratesByAchievementId: Map<string, number>;
+  classStudentCount: number;
+  error: string | null;
+}> {
+  const empty = {
+    ratesByAchievementId: new Map<string, number>(),
+    classStudentCount: 0,
+    error: null as string | null,
+  };
+
+  if (achievementIds.length === 0) {
+    return empty;
+  }
+
+  const { data: me, error: meError } = await supabase
+    .from("students")
+    .select("class")
+    .eq("gakusei_id", gakuseiId)
+    .maybeSingle();
+
+  if (meError) {
+    return { ...empty, error: meError.message };
+  }
+
+  const className =
+    typeof me?.class === "string" ? me.class.trim() : "";
+
+  if (!className) {
+    return empty;
+  }
+
+  const { data: classmates, error: classError } = await supabase
+    .from("students")
+    .select("gakusei_id")
+    .eq("class", className);
+
+  if (classError) {
+    return { ...empty, error: classError.message };
+  }
+
+  const classmateIds = ((classmates ?? []) as Array<{ gakusei_id: string }>)
+    .map((row) => row.gakusei_id)
+    .filter((id): id is string => typeof id === "string" && id.length > 0);
+
+  if (classmateIds.length === 0) {
+    return empty;
+  }
+
+  const { data: grants, error: grantsError } = await supabase
+    .from("student_medal_grants")
+    .select("achievement_id, gakusei_id")
+    .in("gakusei_id", classmateIds)
+    .in("achievement_id", [...achievementIds]);
+
+  if (grantsError) {
+    return { ...empty, error: grantsError.message };
+  }
+
+  const holdersByAchievement = new Map<string, Set<string>>();
+
+  for (const row of (grants ?? []) as Array<{
+    achievement_id: string | null;
+    gakusei_id: string | null;
+  }>) {
+    if (
+      typeof row.achievement_id !== "string" ||
+      typeof row.gakusei_id !== "string"
+    ) {
+      continue;
+    }
+
+    const holders = holdersByAchievement.get(row.achievement_id);
+    if (holders) {
+      holders.add(row.gakusei_id);
+    } else {
+      holdersByAchievement.set(row.achievement_id, new Set([row.gakusei_id]));
+    }
+  }
+
+  const ratesByAchievementId = new Map<string, number>();
+  const denominator = classmateIds.length;
+
+  for (const achievementId of achievementIds) {
+    const holders = holdersByAchievement.get(achievementId)?.size ?? 0;
+    ratesByAchievementId.set(
+      achievementId,
+      Math.round((holders / denominator) * 100),
+    );
+  }
+
+  return {
+    ratesByAchievementId,
+    classStudentCount: denominator,
+    error: null,
+  };
 }

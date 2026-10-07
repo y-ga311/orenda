@@ -265,17 +265,6 @@ export function formatQuestQuestionCountLabel(count: number): string {
   return `${count}問`;
 }
 
-/** 中分類リストに登録問題数バッジを出すか（5問未満など選択肢が限られる場合） */
-export function shouldShowQuestSubcategoryCountBadge(
-  availableCount: number,
-): boolean {
-  const safeAvailable = Math.max(0, Math.floor(availableCount));
-  return (
-    safeAvailable > 0 &&
-    safeAvailable < questQuestionCountOptions[0]
-  );
-}
-
 export function getQuestSubcategories(subjectId: string): QuestSubcategory[] {
   return questSubcategoriesBySubject[subjectId] ?? [
     { id: `${subjectId}-general`, label: "総合" },
