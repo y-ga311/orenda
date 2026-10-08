@@ -125,6 +125,20 @@ export async function fetchStudentMedalGrantIds(
   };
 }
 
+/** クラス取得率を出さないメダル（タイトル部分一致） */
+const CLASS_UNLOCK_PERCENT_HIDDEN_TITLE_MARKERS = [
+  "球技大会",
+  "模擬試験",
+  "定期試験１位",
+  "定期試験1位",
+] as const;
+
+export function shouldShowMedalClassUnlockPercent(title: string): boolean {
+  return !CLASS_UNLOCK_PERCENT_HIDDEN_TITLE_MARKERS.some((marker) =>
+    title.includes(marker),
+  );
+}
+
 export function buildStudentMedalList(
   achievements: readonly MedalAchievementRow[],
   grantsByAchievementId: ReadonlyMap<string, string>,
@@ -133,7 +147,9 @@ export function buildStudentMedalList(
   return achievements.map((achievement) => {
     const grantedAt = grantsByAchievementId.get(achievement.id) ?? null;
     const classUnlockPercent =
-      classUnlockPercentByAchievementId?.get(achievement.id) ?? null;
+      shouldShowMedalClassUnlockPercent(achievement.title)
+        ? (classUnlockPercentByAchievementId?.get(achievement.id) ?? null)
+        : null;
 
     return {
       id: achievement.id,

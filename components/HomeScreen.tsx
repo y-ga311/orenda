@@ -70,6 +70,7 @@ import {
 } from "@/components/TeacherQuestBattleScreen";
 import { useTeacherQuestTransition } from "@/components/TeacherQuestBattleTransition";
 import { PostedQuestionsScreen } from "@/components/PostedQuestionsScreen";
+import { GradesScreen } from "@/components/GradesScreen";
 import { useBottomNavVisibility } from "@/lib/useBottomNavVisibility";
 import {
   formatTeacherDisplayName,
@@ -633,6 +634,7 @@ export function HomeScreen() {
     | "quest"
     | "links"
     | "student_quest"
+    | "grades"
   >("menu");
   const [stopwatchReturnScreen, setStopwatchReturnScreen] = useState<"timer" | "quest">(
     "timer",
@@ -1974,10 +1976,12 @@ export function HomeScreen() {
       return "questChoice";
     }
 
+    if (index === correctIndex) {
+      return "questChoice questChoiceCorrect";
+    }
+
     if (index === selectedQuestChoice) {
-      return index === correctIndex
-        ? "questChoice questChoiceCorrect"
-        : "questChoice questChoiceWrong";
+      return "questChoice questChoiceWrong";
     }
 
     return "questChoice questChoiceMuted";
@@ -4672,6 +4676,15 @@ export function HomeScreen() {
     );
   }
 
+  if (isLoggedInPreview && activeScreen === "grades") {
+    return (
+      <GradesScreen
+        backgroundImageSrc={backgroundImage.src}
+        onBack={() => setActiveScreen("menu")}
+      />
+    );
+  }
+
   if (isLoggedInPreview && activeScreen === "links") {
     return (
       <main className="appShell">
@@ -4820,6 +4833,10 @@ export function HomeScreen() {
 
                   if (item.title === "投稿問題") {
                     setActiveScreen("student_quest");
+                  }
+
+                  if (item.title === "成績") {
+                    setActiveScreen("grades");
                   }
                 }}
               >

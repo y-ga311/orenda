@@ -4195,3 +4195,118 @@ a.resourceLinkItem:focus-visible {
   font-size: 13px;
 }
 
+.gradesContent {
+  display: grid;
+  align-content: start;
+  gap: 12px;
+  padding-bottom: 20px;
+}
+
+.gradesLead {
+  margin: 0;
+  color: #6e6e73;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.gradesExamList {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.gradesExamItem {
+  width: 100%;
+}
+
+.gradesDetailHeader {
+  display: grid;
+  gap: 4px;
+  border: 1px solid #e5e5ea;
+  border-radius: 16px;
+  padding: 14px 16px;
+  background: #fff;
+}
+
+.gradesDetailHeader h2 {
+  margin: 0;
+  color: #1d1d1f;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.gradesDetailHeader p {
+  margin: 0;
+  color: #6e6e73;
+  font-size: 13px;
+}
+
+.gradesSummaryCard {
+  display: grid;
+  gap: 10px;
+  border: 1px solid #e9d5ff;
+  border-radius: 16px;
+  padding: 14px 16px;
+  background: #faf5ff;
+}
+
+.gradesSummaryRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.gradesSummaryRow span {
+  color: #6e6e73;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.gradesSummaryRow strong {
+  color: #1d1d1f;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.gradesPass {
+  color: #1b7f3a !important;
+}
+
+.gradesFail {
+  color: #c62828 !important;
+}
+
+.gradesSubjectList {
+  display: grid;
+  gap: 8px;
+}
+
+.gradesSubjectRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border: 1px solid #e5e5ea;
+  border-radius: 12px;
+  padding: 12px 14px;
+  background: #fff;
+}
+
+.gradesSubjectRow h3 {
+  margin: 0;
+  color: #1d1d1f;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.gradesSubjectRow p {
+  margin: 0;
+  color: #3a3a3c;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+

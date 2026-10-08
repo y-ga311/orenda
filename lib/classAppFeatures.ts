@@ -72,7 +72,8 @@ export type AppScreenForFeature =
   | "mypage"
   | "quest"
   | "links"
-  | "student_quest";
+  | "student_quest"
+  | "grades";
 
 function isClassAppFeatureKey(value: unknown): value is ClassAppFeatureKey {
   return (
@@ -104,6 +105,8 @@ export function featureKeyForScreen(
       return "mypage";
     case "links":
       return "links";
+    case "grades":
+      return "grades";
     case "menu":
     default:
       return null;
